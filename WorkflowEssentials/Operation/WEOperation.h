@@ -10,6 +10,7 @@
 
 #import <Foundation/Foundation.h>
 
+@class WEWorkflowContext;
 @class WEOperationResult;
 
 @interface WEOperation : NSObject
@@ -38,7 +39,7 @@
  before the operation is performed.
  Default implementation does nothing.
  */
-- (void)prepareForExecution;
+- (void)prepareForExecutionWithContext:(nonnull __kindof WEWorkflowContext *)context;
 
 /**
  Starts the operation

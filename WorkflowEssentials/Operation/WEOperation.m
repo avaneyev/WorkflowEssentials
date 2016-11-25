@@ -37,7 +37,7 @@
     THROW_ABSTRACT(nil);
 }
 
-- (void)prepareForExecution
+- (void)prepareForExecutionWithContext:(__kindof WEWorkflowContext *)context
 {
     // Default implementation does nothing
 }
