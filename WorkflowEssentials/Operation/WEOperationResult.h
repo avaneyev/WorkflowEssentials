@@ -12,4 +12,11 @@
 
 @interface WEOperationResult : NSObject
 
+- (nonnull instancetype)initWithResult:(nullable id<NSCopying>)result;
+- (nonnull instancetype)initWithError:(nonnull NSError *)error;
+
+@property (nonatomic, readonly, getter=isFailed) BOOL failed;
+@property (nonatomic, readonly, copy, nullable) id<NSCopying> result;
+@property (nonatomic, readonly, strong, nullable) NSError *error;
+
 @end
