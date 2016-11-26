@@ -10,6 +10,19 @@
 
 #import <Foundation/Foundation.h>
 
+@class WEWorkflowContext;
+@class WEOperation;
+
 @interface WEWorkflow : NSObject
+
+- (nonnull instancetype)initWithContextClass:(nullable Class)contextClass
+                 maximumConcurrentOperations:(NSUInteger)maximumConcurrentOperations;
+
+@property (nonatomic, readonly, getter=isActive) BOOL active;
+
+@property (nonatomic, readonly, strong, nonnull) WEWorkflowContext *context;
+
+@property (nonatomic, readonly, nonnull) NSArray<WEOperation *> *operations;
+@property (nonatomic, readonly) NSUInteger operationCount;
 
 @end

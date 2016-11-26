@@ -17,13 +17,13 @@
 #define ENTER_CRITICAL_SECTION(context)           \
 @try                                              \
 {                                                 \
-pthread_mutex_lock(&(context->_contextMutex));
+    pthread_mutex_lock(&(context->_contextMutex));
 
 #define LEAVE_CRITICAL_SECTION(context)             \
 }                                                   \
 @finally                                            \
 {                                                   \
-pthread_mutex_unlock(&(context->_contextMutex));    \
+    pthread_mutex_unlock(&(context->_contextMutex));\
 }
 
 
