@@ -13,20 +13,6 @@
 #include <pthread.h>
 #import "WETools.h"
 
-// Pair of macros to enter and leave the critical section
-#define ENTER_CRITICAL_SECTION(context)           \
-@try                                              \
-{                                                 \
-    pthread_mutex_lock(&(context->_contextMutex));
-
-#define LEAVE_CRITICAL_SECTION(context)             \
-}                                                   \
-@finally                                            \
-{                                                   \
-    pthread_mutex_unlock(&(context->_contextMutex));\
-}
-
-
 @implementation WEWorkflowContext
 {
     pthread_mutex_t _contextMutex;
@@ -49,9 +35,9 @@
     if (name == nil) THROW_INVALID_PARAM(name, nil);
     WEOperationResult *result;
     
-    ENTER_CRITICAL_SECTION(self)
+    ENTER_CRITICAL_SECTION(self, _contextMutex)
         result = _results[name];
-    LEAVE_CRITICAL_SECTION(self);
+    LEAVE_CRITICAL_SECTION(self, _contextMutex)
 
     return result;
 }
@@ -61,9 +47,9 @@
     if (key == nil) THROW_INVALID_PARAM(key, nil);
 
     id result;
-    ENTER_CRITICAL_SECTION(self)
+    ENTER_CRITICAL_SECTION(self, _contextMutex)
         result = _userContext[key];
-    LEAVE_CRITICAL_SECTION(self);
+    LEAVE_CRITICAL_SECTION(self, _contextMutex)
     return result;
 }
 
@@ -72,19 +58,19 @@
     if (key == nil) THROW_INVALID_PARAM(key, nil);
     if (value == nil) THROW_INVALID_PARAM(value, nil);
 
-    ENTER_CRITICAL_SECTION(self)
+    ENTER_CRITICAL_SECTION(self, _contextMutex)
         if (_userContext == nil) _userContext = [NSMutableDictionary new];
         _userContext[key] = value;
-    LEAVE_CRITICAL_SECTION(self);
+    LEAVE_CRITICAL_SECTION(self, _contextMutex)
 }
 
 - (void)removeContextValueForKey:(id<NSCopying>)key
 {
     if (key == nil) THROW_INVALID_PARAM(key, nil);
     
-    ENTER_CRITICAL_SECTION(self)
+    ENTER_CRITICAL_SECTION(self, _contextMutex)
         [_userContext removeObjectForKey:key];
-    LEAVE_CRITICAL_SECTION(self);
+    LEAVE_CRITICAL_SECTION(self, _contextMutex)
 }
 
 @end

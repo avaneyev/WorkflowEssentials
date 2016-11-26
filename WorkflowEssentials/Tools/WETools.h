@@ -23,4 +23,18 @@
 #define THROW_INVALID_PARAMS(info) @throw [NSException exceptionWithName:NSInvalidArgumentException reason:[NSString stringWithFormat:@"%s received invalid parameters!",  __PRETTY_FUNCTION__] userInfo:(info)]
 #define THROW_INVALID_PARAM(param, info) @throw [NSException exceptionWithName:NSInvalidArgumentException reason:[NSString stringWithFormat:@"%s received invalid %s",  __PRETTY_FUNCTION__, #param] userInfo:(info)]
 
+// Pair of macros to enter and leave the critical section
+#define ENTER_CRITICAL_SECTION(object, mutex)       \
+@try                                                \
+{                                                   \
+    pthread_mutex_lock(&(object->mutex));
+
+#define LEAVE_CRITICAL_SECTION(object, mutex)       \
+}                                                   \
+@finally                                            \
+{                                                   \
+    pthread_mutex_unlock(&(object->mutex));         \
+}
+
+
 #endif
