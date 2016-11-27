@@ -30,6 +30,11 @@
     return self;
 }
 
+- (void)dealloc
+{
+    pthread_mutex_destroy(&_contextMutex);
+}
+
 - (WEOperationResult *)resultForOperationName:(NSString *)name
 {
     if (name == nil) THROW_INVALID_PARAM(name, nil);

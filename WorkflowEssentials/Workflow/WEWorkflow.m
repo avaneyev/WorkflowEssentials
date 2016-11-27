@@ -22,7 +22,8 @@
     
     pthread_mutex_t _operationMutex;
     NSMutableArray<WEOperation *> *_operations;
-    NSOrderedSet<WEOperation *> *_operationsReadyToExecute;
+    NSMutableOrderedSet<WEOperation *> *_operationsReadyToExecute;
+    NSMutableSet<WEOperation *> *_activeOperations;
 }
 
 - (instancetype)init
@@ -33,23 +34,29 @@
 - (instancetype)initWithContextClass:(Class)contextClass
          maximumConcurrentOperations:(NSUInteger)maximumConcurrentOperations
 {
-    if (contextClass != nil && ![contextClass isSubclassOfClass:[WEWorkflowContext class]])
+    Class defaultClass = [WEWorkflowContext class];
+    if (contextClass != nil && contextClass != defaultClass && ![contextClass isSubclassOfClass:defaultClass])
     {
         THROW_INVALID_PARAM(contextClass, nil);
     }
     
     if (self = [super init])
     {
-        if (contextClass == nil) contextClass = [WEWorkflowContext class];
+        if (contextClass == nil) contextClass = defaultClass;
         _context = [[contextClass alloc] init];
         
         _maximumConcurrentOperations = (maximumConcurrentOperations > 0) ? maximumConcurrentOperations : INT32_MAX;
         
         pthread_mutex_init(&_operationMutex, NULL);
         _operations = [NSMutableArray new];
-        _operationsReadyToExecute = [NSOrderedSet new];
+        _operationsReadyToExecute = [NSMutableOrderedSet new];
     }
     return self;
+}
+
+- (void)dealloc
+{
+    pthread_mutex_destroy(&_operationMutex);
 }
 
 

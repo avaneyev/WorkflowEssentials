@@ -33,6 +33,21 @@
 @property (nonatomic, readonly) BOOL requiresMainThread;
 
 /**
+ Returns YES if the operation is active (in progress) and NO otherwise.
+ */
+@property (nonatomic, readonly, getter=isActive) BOOL active;
+
+/**
+ Returns YES if the operation is finished (completed, successfully or with an error) and NO otherwise.
+ */
+@property (nonatomic, readonly, getter=isFinished) BOOL finished;
+
+/**
+ Returns YES if the operation is cancelled and NO otherwise.
+ */
+@property (nonatomic, readonly, getter=isCancelled) BOOL cancelled;
+
+/**
  Called when the workflow is ready to start an operation, but before the start.
  Allows an operation to to prepare itself for execution.
  This gives an operation a chance to check its prerequisites and schedule additional work to be done 
