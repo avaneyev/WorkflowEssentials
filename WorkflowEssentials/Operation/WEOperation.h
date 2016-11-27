@@ -17,11 +17,8 @@
 
 - (nonnull instancetype)initWithName:(nullable NSString *)name NS_DESIGNATED_INITIALIZER;
 
-/**
- Optional operation name that can be used by other operations to its result or
- the operation itself as a dependency.
- */
-@property (nonatomic, readonly, retain, nullable) NSString *name;
+
+#pragma mark - Overridables
 
 /**
  An operation should return YES if it requires main thread for execution, otherwise it should return NO.
@@ -31,6 +28,29 @@
  requires main queue if they are async and don't depend on each other.
  */
 @property (nonatomic, readonly) BOOL requiresMainThread;
+
+/**
+ Called when the workflow is ready to start an operation, but before the start.
+ Allows an operation to to prepare itself for execution.
+ This gives an operation a chance to check its prerequisites and schedule additional work to be done
+ before the operation is performed.
+ Default implementation does nothing.
+ */
+- (void)prepareForExecutionWithContext:(nonnull __kindof WEWorkflowContext *)context;
+
+/**
+ Overridable method starting the operation. Subclasses must implement this method. Default implementation throws an exception.
+ */
+- (void)start;
+
+
+#pragma mark - Operation state
+
+/**
+ Optional operation name that can be used by other operations to its result or
+ the operation itself as a dependency.
+ */
+@property (nonatomic, readonly, retain, nullable) NSString *name;
 
 /**
  Returns YES if the operation is active (in progress) and NO otherwise.
@@ -48,18 +68,20 @@
 @property (nonatomic, readonly, getter=isCancelled) BOOL cancelled;
 
 /**
- Called when the workflow is ready to start an operation, but before the start.
- Allows an operation to to prepare itself for execution.
- This gives an operation a chance to check its prerequisites and schedule additional work to be done 
- before the operation is performed.
- Default implementation does nothing.
- */
-- (void)prepareForExecutionWithContext:(nonnull __kindof WEWorkflowContext *)context;
-
-/**
  Starts the operation
  @param completion completion block that needs to be invoked when the operation completes
+ @discussion This method will be called by the workflow. 
+ If an operation is started manually, this method should be called. 
+ It updates the state and invokes `start` method, which should be overridden by subclasses to start an actual operation.
  */
-- (void)startWithCompletion:(nonnull void (^)(WEOperationResult * _Nullable result))completion;
+- (void)startWithCompletion:(nullable void (^)(WEOperationResult * _Nullable result))completion completionQueue:(nullable dispatch_queue_t)completionQueue;
+
+/**
+ Marks operation as complete with appropriate result.
+ @param result Operation result
+ @discussion a subclass must call this method when an operation is complete.
+ It will update the operation state and invoke a callback.
+ */
+- (void)completeWithResult:(nullable WEOperationResult *)result;
 
 @end
