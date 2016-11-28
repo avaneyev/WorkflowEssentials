@@ -27,6 +27,7 @@ typedef enum
     pthread_mutex_t _mutex;
     WEOperationState _state;
     NSString *_name;
+    WEOperationResult *_result;
     void (^_completion)(WEOperationResult *result);
     dispatch_queue_t _completionQueue;
 }
@@ -42,7 +43,10 @@ typedef enum
 {
     Class ownClass = self.class;
     Class baseClass = WEOperation.class;
-    if (ownClass == baseClass) THROW_ABSTRACT(@{ NSLocalizedDescriptionKey: @"WEOperation is abstract and must be subclassed." });
+    if (ownClass == baseClass)
+    {
+        THROW_ABSTRACT(@{ NSLocalizedDescriptionKey: @"WEOperation is abstract and must be subclassed." });
+    }
     
     if (self = [super init])
     {
@@ -85,13 +89,27 @@ _IsOperationInState(__unsafe_unretained WEOperation *operation, WEOperationState
     return _IsOperationInState(self, WEOperationCancelled);
 }
 
+- (WEOperationResult *)result
+{
+    // Ensure that state transition is complete before returning a value to avoid inconsistencies.
+    
+    WEOperationResult *result;
+    ENTER_CRITICAL_SECTION(self, _mutex)
+    result = _result;
+    LEAVE_CRITICAL_SECTION(self, _mutex)
+    return result;
+}
+
 - (void)startWithCompletion:(void (^)(WEOperationResult * _Nullable))completion completionQueue:(dispatch_queue_t)completionQueue
 {
     if ((completion != nil) ^ (completionQueue != nil)) THROW_INVALID_PARAMS(@{ NSLocalizedDescriptionKey: @"Either completion or completion queue is nil, but not both" });
 
     ENTER_CRITICAL_SECTION(self, _mutex)
     
-    if (_state != WEOperationInactive) THROW_INCONSISTENCY(@{ NSLocalizedDescriptionKey: @"Operation cannot start because it is in an invalid state" });
+    if (_state != WEOperationInactive)
+    {
+        THROW_INCONSISTENCY(@{ NSLocalizedDescriptionKey: @"Operation cannot start because it is in an invalid state" });
+    }
     
     _state = WEOperationActive;
     _completion = completion;
@@ -106,13 +124,30 @@ _IsOperationInState(__unsafe_unretained WEOperation *operation, WEOperationState
 {
     if (result == nil) THROW_INVALID_PARAM(result, @{ NSLocalizedDescriptionKey: @"Result must be provided" });
     
+    void (^completion)(WEOperationResult *result);
+    dispatch_queue_t completionQueue = nil;
+    
     ENTER_CRITICAL_SECTION(self, _mutex)
     
-    if (_state != WEOperationActive) THROW_INCONSISTENCY(@{ NSLocalizedDescriptionKey: @"Operation cannot be completed because it is in an invalid state" });
+    if (_state != WEOperationActive)
+    {
+        THROW_INCONSISTENCY(@{ NSLocalizedDescriptionKey: @"Operation cannot be completed because it is in an invalid state" });
+    }
+    
+    completion = _completion;
+    completionQueue = _completionQueue;
     
     _state = WEOperationComplete;
+    _completion = nil;
+    _completionQueue = nil;
+    _result = result;
 
     LEAVE_CRITICAL_SECTION(self, _mutex)
+    
+    if (completion != nil)
+    {
+        dispatch_async(completionQueue, ^{ completion(result); });
+    }
 }
 
 

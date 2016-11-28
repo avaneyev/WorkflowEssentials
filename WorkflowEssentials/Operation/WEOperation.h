@@ -67,6 +67,8 @@
  */
 @property (nonatomic, readonly, getter=isCancelled) BOOL cancelled;
 
+@property (nonatomic, readonly, strong, nullable) WEOperationResult *result;
+
 /**
  Starts the operation
  @param completion completion block that needs to be invoked when the operation completes
