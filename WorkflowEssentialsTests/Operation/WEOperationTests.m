@@ -44,4 +44,24 @@ static NSString *const WEOperationSimpleSubclassResult = @"WEOperationSimpleSubc
     XCTAssertEqualObjects(operation.name, @"operationName");
 }
 
+- (void)testSimpleOperationToCompletion
+{
+    XCTestExpectation *expectation = [self expectationWithDescription:@"wait until operation completes"];
+    WEOperationSimpleSubclass *operation = [[WEOperationSimpleSubclass alloc] initWithName:@"operationName"];
+    [operation startWithCompletion:^(WEOperationResult * _Nullable result) {
+        XCTAssert(operation.finished);
+        
+        WEOperationResult *operationResult = operation.result;
+        XCTAssertNotNil(operationResult);
+        XCTAssertEqualObjects(operationResult.result, WEOperationSimpleSubclassResult);
+        
+        [expectation fulfill];
+    } completionQueue:dispatch_get_main_queue()];
+    
+    [self waitForExpectationsWithTimeout:0.5 handler:^(NSError *error) {
+        // retain operation until completion
+        (void)operation;
+    }];
+}
+
 @end
