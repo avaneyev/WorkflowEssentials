@@ -16,6 +16,7 @@ FOUNDATION_EXPORT double WorkflowEssentialsVersionNumber;
 //! Project version string for WorkflowEssentials.
 FOUNDATION_EXPORT const unsigned char WorkflowEssentialsVersionString[];
 
-// In this header, you should import all the public headers of your framework using statements like #import <WorkflowEssentials/PublicHeader.h>
-
-
+#import <WorkflowEssentials/WEOperation.h>
+#import <WorkflowEssentials/WEOperationResult.h>
+#import <WorkflowEssentials/WEWorkflow.h>
+#import <WorkflowEssentials/WEWorkflowContext.h>
