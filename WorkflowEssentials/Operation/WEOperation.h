@@ -9,11 +9,11 @@
 //
 
 #import <Foundation/Foundation.h>
+#import <WorkflowEssentials/WEOperationResult.h>
 
 @class WEWorkflowContext;
-@class WEOperationResult;
 
-@interface WEOperation : NSObject
+@interface WEOperation<__covariant WEResultType : id<NSCopying> > : NSObject
 
 - (nonnull instancetype)initWithName:(nullable NSString *)name NS_DESIGNATED_INITIALIZER;
 
@@ -67,7 +67,7 @@
  */
 @property (nonatomic, readonly, getter=isCancelled) BOOL cancelled;
 
-@property (nonatomic, readonly, strong, nullable) WEOperationResult *result;
+@property (nonatomic, readonly, strong, nullable) WEOperationResult<WEResultType> *result;
 
 /**
  Starts the operation
@@ -76,7 +76,7 @@
  If an operation is started manually, this method should be called. 
  It updates the state and invokes `start` method, which should be overridden by subclasses to start an actual operation.
  */
-- (void)startWithCompletion:(nullable void (^)(WEOperationResult * _Nullable result))completion completionQueue:(nullable dispatch_queue_t)completionQueue;
+- (void)startWithCompletion:(nullable void (^)(WEOperationResult<WEResultType> * _Nullable result))completion completionQueue:(nullable dispatch_queue_t)completionQueue;
 
 /**
  Marks operation as complete with appropriate result.
@@ -84,6 +84,6 @@
  @discussion a subclass must call this method when an operation is complete.
  It will update the operation state and invoke a callback.
  */
-- (void)completeWithResult:(nullable WEOperationResult *)result;
+- (void)completeWithResult:(nullable WEOperationResult<WEResultType> *)result;
 
 @end
