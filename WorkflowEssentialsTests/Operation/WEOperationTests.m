@@ -14,7 +14,7 @@
 
 static NSString *const WEOperationSimpleSubclassResult = @"WEOperationSimpleSubclass";
 
-@interface WEOperationSimpleSubclass : WEOperation
+@interface WEOperationSimpleSubclass : WEOperation<NSString *>
 @end
 
 @implementation WEOperationSimpleSubclass
@@ -22,7 +22,7 @@ static NSString *const WEOperationSimpleSubclassResult = @"WEOperationSimpleSubc
 - (void)start
 {
     dispatch_async(dispatch_get_main_queue(), ^{
-        WEOperationResult *result = [[WEOperationResult alloc] initWithResult:WEOperationSimpleSubclassResult];
+        WEOperationResult<NSString *> *result = [[WEOperationResult alloc] initWithResult:WEOperationSimpleSubclassResult];
         [self completeWithResult:result];
     });
 }
@@ -48,10 +48,10 @@ static NSString *const WEOperationSimpleSubclassResult = @"WEOperationSimpleSubc
 {
     XCTestExpectation *expectation = [self expectationWithDescription:@"wait until operation completes"];
     WEOperationSimpleSubclass *operation = [[WEOperationSimpleSubclass alloc] initWithName:@"operationName"];
-    [operation startWithCompletion:^(WEOperationResult * _Nullable result) {
+    [operation startWithCompletion:^(WEOperationResult<NSString *> * _Nullable result) {
         XCTAssert(operation.finished);
         
-        WEOperationResult *operationResult = operation.result;
+        WEOperationResult<NSString *> *operationResult = operation.result;
         XCTAssertNotNil(operationResult);
         XCTAssertEqualObjects(operationResult.result, WEOperationSimpleSubclassResult);
         

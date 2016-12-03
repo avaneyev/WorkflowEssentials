@@ -27,7 +27,7 @@ typedef enum
     pthread_mutex_t _mutex;
     WEOperationState _state;
     NSString *_name;
-    WEOperationResult *_result;
+    WEOperationResult<id<NSCopying>> *_result;
     void (^_completion)(WEOperationResult *result);
     dispatch_queue_t _completionQueue;
 }
@@ -100,7 +100,7 @@ _IsOperationInState(__unsafe_unretained WEOperation *operation, WEOperationState
     return result;
 }
 
-- (void)startWithCompletion:(void (^)(WEOperationResult * _Nullable))completion completionQueue:(dispatch_queue_t)completionQueue
+- (void)startWithCompletion:(void (^)(WEOperationResult<id<NSCopying>> * _Nullable))completion completionQueue:(dispatch_queue_t)completionQueue
 {
     if ((completion != nil) ^ (completionQueue != nil)) THROW_INVALID_PARAMS(@{ NSLocalizedDescriptionKey: @"Either completion or completion queue is nil, but not both" });
 

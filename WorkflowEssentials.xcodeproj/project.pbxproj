@@ -10,6 +10,7 @@
 		D57205DF1DE23D580071E38A /* WorkflowEssentials.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D57205D51DE23D580071E38A /* WorkflowEssentials.framework */; };
 		D57205E61DE23D580071E38A /* WorkflowEssentials.h in Headers */ = {isa = PBXBuildFile; fileRef = D57205D81DE23D580071E38A /* WorkflowEssentials.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		D5B49A191DEBD24B001DCD67 /* WEOperationTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D5B49A181DEBD24B001DCD67 /* WEOperationTests.m */; };
+		D5BD72581DF352B700AC8FE8 /* WEOperationResultTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D5BD72571DF352B700AC8FE8 /* WEOperationResultTests.m */; };
 		D5CDF76A1DE7601E009668ED /* WEOperation.h in Headers */ = {isa = PBXBuildFile; fileRef = D5CDF7681DE7601E009668ED /* WEOperation.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		D5CDF76B1DE7601E009668ED /* WEOperation.m in Sources */ = {isa = PBXBuildFile; fileRef = D5CDF7691DE7601E009668ED /* WEOperation.m */; };
 		D5CDF76E1DE769FD009668ED /* WEWorkflow.h in Headers */ = {isa = PBXBuildFile; fileRef = D5CDF76C1DE769FD009668ED /* WEWorkflow.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -38,6 +39,7 @@
 		D57205DE1DE23D580071E38A /* WorkflowEssentialsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WorkflowEssentialsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D57205E51DE23D580071E38A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		D5B49A181DEBD24B001DCD67 /* WEOperationTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WEOperationTests.m; sourceTree = "<group>"; };
+		D5BD72571DF352B700AC8FE8 /* WEOperationResultTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WEOperationResultTests.m; sourceTree = "<group>"; };
 		D5CDF7681DE7601E009668ED /* WEOperation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WEOperation.h; sourceTree = "<group>"; };
 		D5CDF7691DE7601E009668ED /* WEOperation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WEOperation.m; sourceTree = "<group>"; };
 		D5CDF76C1DE769FD009668ED /* WEWorkflow.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WEWorkflow.h; sourceTree = "<group>"; };
@@ -111,6 +113,7 @@
 			isa = PBXGroup;
 			children = (
 				D5B49A181DEBD24B001DCD67 /* WEOperationTests.m */,
+				D5BD72571DF352B700AC8FE8 /* WEOperationResultTests.m */,
 			);
 			path = Operation;
 			sourceTree = "<group>";
@@ -270,6 +273,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D5BD72581DF352B700AC8FE8 /* WEOperationResultTests.m in Sources */,
 				D5B49A191DEBD24B001DCD67 /* WEOperationTests.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
