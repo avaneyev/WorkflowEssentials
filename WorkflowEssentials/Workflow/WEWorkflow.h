@@ -22,7 +22,7 @@
  @return an instance of `WEWorkflow`
  */
 - (nonnull instancetype)initWithContextClass:(nullable Class)contextClass
-                 maximumConcurrentOperations:(NSUInteger)maximumConcurrentOperations;
+                 maximumConcurrentOperations:(NSUInteger)maximumConcurrentOperations NS_DESIGNATED_INITIALIZER;
 
 /**
  returns YES if the workflow is active, and NO otherwise

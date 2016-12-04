@@ -10,9 +10,15 @@
 
 #import <Foundation/Foundation.h>
 
+@class WEWorkflow;
 @class WEOperationResult;
 
 @interface WEWorkflowContext : NSObject
+
+- (nullable instancetype)init NS_UNAVAILABLE;
+- (nonnull instancetype)initWithWorkflow:(nonnull WEWorkflow *)workflow NS_DESIGNATED_INITIALIZER;
+
+@property (nonatomic, readonly, weak, nullable) WEWorkflow *workflow;
 
 - (nullable WEOperationResult *)resultForOperationName:(nonnull NSString *)name;
 

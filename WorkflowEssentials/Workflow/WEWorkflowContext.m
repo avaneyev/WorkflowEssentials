@@ -9,21 +9,26 @@
 //
 
 #import <WorkflowEssentials/WEWorkflowContext.h>
+#import <WorkflowEssentials/WEWorkflow.h>
 
 #include <pthread.h>
 #import "WETools.h"
 
 @implementation WEWorkflowContext
 {
+    __weak WEWorkflow *_workflow;
     pthread_mutex_t _contextMutex;
     NSMutableDictionary<NSString *, WEOperationResult *> *_results;
     NSMutableDictionary<id<NSCopying>, id> *_userContext;
 }
 
-- (instancetype)init
+@synthesize workflow = _workflow;
+
+- (instancetype)initWithWorkflow:(WEWorkflow *)workflow
 {
     if (self = [super init])
     {
+        _workflow = workflow;
         pthread_mutex_init(&_contextMutex, NULL);
         _results = [NSMutableDictionary new];
     }

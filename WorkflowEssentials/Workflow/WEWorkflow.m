@@ -43,7 +43,7 @@
     if (self = [super init])
     {
         if (contextClass == nil) contextClass = defaultClass;
-        _context = [[contextClass alloc] init];
+        _context = [[contextClass alloc] initWithWorkflow:self];
         
         _maximumConcurrentOperations = (maximumConcurrentOperations > 0) ? maximumConcurrentOperations : INT32_MAX;
         
