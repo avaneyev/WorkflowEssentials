@@ -44,4 +44,14 @@
  */
 @property (nonatomic, readonly) NSUInteger operationCount;
 
+/**
+ Adds a single operation
+ */
+- (void)addOperation:(nonnull WEOperation *)operation;
+
+/**
+ Starts executing the workflow
+ */
+- (void)start;
+
 @end
