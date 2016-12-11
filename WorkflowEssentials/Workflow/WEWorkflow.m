@@ -275,7 +275,7 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
     {
         [self _completeWorkflow];
     }
-    else
+    else if (_operationsReadyToExecute.count > 0)
     {
         [self _checkAndStartReadyOperation];
     }
