@@ -14,6 +14,7 @@
 
 #import <pthread.h>
 #import "WETools.h"
+#import "WEWorkflowContext+Private.h"
 
 typedef enum
 {
@@ -79,6 +80,15 @@ typedef enum
     isActive = _state == WEWorkflowActive;
     LEAVE_CRITICAL_SECTION(self, _operationMutex)
     return isActive;
+}
+
+- (BOOL)isCompleted
+{
+    BOOL isCompleted = NO;
+    ENTER_CRITICAL_SECTION(self, _operationMutex)
+    isCompleted = _state == WEWorkflowComplete;
+    LEAVE_CRITICAL_SECTION(self, _operationMutex)
+    return isCompleted;
 }
 
 - (NSArray<WEOperation *> *)operations
@@ -162,6 +172,14 @@ typedef enum
     }
 }
 
+static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperation *operation)
+{
+    if (operation.requiresMainThread) return dispatch_get_main_queue();
+    
+    // TODO: make priority-based decision
+    return dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+}
+
 - (void)_checkAndStartReadyOperation
 {
     // There may not be any operations ready to execute - all operations that are not running are waiting,
@@ -176,10 +194,75 @@ typedef enum
     
     // Only proceed if had not reached maximum number of operations allowed.
     if (_maximumConcurrentOperations > 0 && _activeOperations.count >= _maximumConcurrentOperations) return;
+    
+    WEOperation *firstReadyOperation = _operationsReadyToExecute.firstObject;
+    [_operationsReadyToExecute removeObject:firstReadyOperation];
+    WEAssert(firstReadyOperation != nil);
+    WEAssert(!firstReadyOperation.active && !firstReadyOperation.finished && !firstReadyOperation.cancelled);
+    
+    dispatch_queue_t operationQueue = _WEQueueForOperation(firstReadyOperation);
+    
+    dispatch_async(operationQueue, ^{
+        // TODO: pass explicit builder as the only facility an operation can amend the workflow.
+        [firstReadyOperation prepareForExecutionWithContext:self->_context];
+        dispatch_async(self->_workflowInternalQueue, ^{
+            [self _runOperationIfStillPossible:firstReadyOperation onQueue:operationQueue];
+        });
+    });
+}
+
+- (void)_runOperationIfStillPossible:(WEOperation *)operation onQueue:(dispatch_queue_t)queue
+{
+    WEAssert(operation != nil);
+    WEAssert(![_activeOperations containsObject:operation]);
+    
+    [_activeOperations addObject:operation];
+    dispatch_async(queue, ^{
+        [operation startWithCompletion:^(WEOperationResult * _Nullable result) {
+            [self _completeOperation:operation withResult:result];
+        } completionQueue:self->_workflowInternalQueue];
+    });
+}
+
+- (void)_completeOperation:(WEOperation *)operation withResult:(WEOperationResult *)result
+{
+    WEAssert(operation != nil);
+    WEAssert(![_activeOperations containsObject:operation]);
+
+    [_activeOperations removeObject:operation];
+    NSString *operationName = operation.name;
+    if (operationName != nil)
+    {
+        [_context _setOperationResult:result forOperationName:operationName];
+    }
+    
+    // check if workflow is complete.
+    // for now, since all operations are immediately ready, only check if something is active or waiting
+    
+    // TODO: check if any operations depending on the one just completed can now run
+    
+    if (_activeOperations.count == 0 && _operationsReadyToExecute.count == 0)
+    {
+        [self _completeWorkflow];
+    }
+    else
+    {
+        [self _checkAndStartReadyOperation];
+    }
 }
 
 - (void)_completeWorkflow
 {
+    WEAssert(_activeOperations.count == 0);
+    WEAssert(_operationsReadyToExecute.count == 0);
+    
+    ENTER_CRITICAL_SECTION(self, _operationMutex)
+    
+    WEAssert(_state == WEWorkflowActive);
+    _state = WEWorkflowComplete;
+    
+    LEAVE_CRITICAL_SECTION(self, _operationMutex)
+    
     // TODO: notify completion?
 }
 

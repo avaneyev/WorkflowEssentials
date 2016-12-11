@@ -13,6 +13,7 @@
 
 #include <pthread.h>
 #import "WETools.h"
+#import "WEWorkflowContext+Private.h"
 
 @implementation WEWorkflowContext
 {
@@ -50,6 +51,16 @@
     LEAVE_CRITICAL_SECTION(self, _contextMutex)
 
     return result;
+}
+
+- (void)_setOperationResult:(WEOperationResult *)result forOperationName:(NSString *)operationName
+{
+    WEAssert(result != nil);
+    WEAssert(operationName != nil);
+    
+    ENTER_CRITICAL_SECTION(self, _contextMutex)
+        _results[operationName] = result;
+    LEAVE_CRITICAL_SECTION(self, _contextMutex)
 }
 
 - (id)contextValueForKey:(id<NSCopying>)key

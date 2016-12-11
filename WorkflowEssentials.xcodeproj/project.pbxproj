@@ -11,6 +11,10 @@
 		D57205E61DE23D580071E38A /* WorkflowEssentials.h in Headers */ = {isa = PBXBuildFile; fileRef = D57205D81DE23D580071E38A /* WorkflowEssentials.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		D5B49A191DEBD24B001DCD67 /* WEOperationTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D5B49A181DEBD24B001DCD67 /* WEOperationTests.m */; };
 		D5BD72581DF352B700AC8FE8 /* WEOperationResultTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D5BD72571DF352B700AC8FE8 /* WEOperationResultTests.m */; };
+		D5BD725A1DFCE20300AC8FE8 /* WEWorkflowContext+Private.h in Headers */ = {isa = PBXBuildFile; fileRef = D5BD72591DFCE15900AC8FE8 /* WEWorkflowContext+Private.h */; };
+		D5BD725D1DFCE3AC00AC8FE8 /* WEWorkflowTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D5BD725C1DFCE3AC00AC8FE8 /* WEWorkflowTests.m */; };
+		D5BD72601DFCE5CF00AC8FE8 /* WEBlockOperation.h in Headers */ = {isa = PBXBuildFile; fileRef = D5BD725E1DFCE5CF00AC8FE8 /* WEBlockOperation.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		D5BD72611DFCE5CF00AC8FE8 /* WEBlockOperation.m in Sources */ = {isa = PBXBuildFile; fileRef = D5BD725F1DFCE5CF00AC8FE8 /* WEBlockOperation.m */; };
 		D5CDF76A1DE7601E009668ED /* WEOperation.h in Headers */ = {isa = PBXBuildFile; fileRef = D5CDF7681DE7601E009668ED /* WEOperation.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		D5CDF76B1DE7601E009668ED /* WEOperation.m in Sources */ = {isa = PBXBuildFile; fileRef = D5CDF7691DE7601E009668ED /* WEOperation.m */; };
 		D5CDF76E1DE769FD009668ED /* WEWorkflow.h in Headers */ = {isa = PBXBuildFile; fileRef = D5CDF76C1DE769FD009668ED /* WEWorkflow.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -40,6 +44,10 @@
 		D57205E51DE23D580071E38A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		D5B49A181DEBD24B001DCD67 /* WEOperationTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WEOperationTests.m; sourceTree = "<group>"; };
 		D5BD72571DF352B700AC8FE8 /* WEOperationResultTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WEOperationResultTests.m; sourceTree = "<group>"; };
+		D5BD72591DFCE15900AC8FE8 /* WEWorkflowContext+Private.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "WEWorkflowContext+Private.h"; sourceTree = "<group>"; };
+		D5BD725C1DFCE3AC00AC8FE8 /* WEWorkflowTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WEWorkflowTests.m; sourceTree = "<group>"; };
+		D5BD725E1DFCE5CF00AC8FE8 /* WEBlockOperation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WEBlockOperation.h; sourceTree = "<group>"; };
+		D5BD725F1DFCE5CF00AC8FE8 /* WEBlockOperation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WEBlockOperation.m; sourceTree = "<group>"; };
 		D5CDF7681DE7601E009668ED /* WEOperation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WEOperation.h; sourceTree = "<group>"; };
 		D5CDF7691DE7601E009668ED /* WEOperation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WEOperation.m; sourceTree = "<group>"; };
 		D5CDF76C1DE769FD009668ED /* WEWorkflow.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WEWorkflow.h; sourceTree = "<group>"; };
@@ -104,6 +112,7 @@
 			isa = PBXGroup;
 			children = (
 				D5B49A171DEBD225001DCD67 /* Operation */,
+				D5BD725B1DFCE37C00AC8FE8 /* Workflow */,
 				D57205E51DE23D580071E38A /* Info.plist */,
 			);
 			path = WorkflowEssentialsTests;
@@ -118,12 +127,21 @@
 			path = Operation;
 			sourceTree = "<group>";
 		};
+		D5BD725B1DFCE37C00AC8FE8 /* Workflow */ = {
+			isa = PBXGroup;
+			children = (
+				D5BD725C1DFCE3AC00AC8FE8 /* WEWorkflowTests.m */,
+			);
+			path = Workflow;
+			sourceTree = "<group>";
+		};
 		D5CDF7661DE75F87009668ED /* Workflow */ = {
 			isa = PBXGroup;
 			children = (
 				D5CDF76C1DE769FD009668ED /* WEWorkflow.h */,
 				D5CDF76D1DE769FD009668ED /* WEWorkflow.m */,
 				D5CDF7701DE76A2F009668ED /* WEWorkflowContext.h */,
+				D5BD72591DFCE15900AC8FE8 /* WEWorkflowContext+Private.h */,
 				D5CDF7711DE76A2F009668ED /* WEWorkflowContext.m */,
 			);
 			path = Workflow;
@@ -136,6 +154,8 @@
 				D5CDF7691DE7601E009668ED /* WEOperation.m */,
 				D5CDF7741DE76A60009668ED /* WEOperationResult.h */,
 				D5CDF7751DE76A60009668ED /* WEOperationResult.m */,
+				D5BD725E1DFCE5CF00AC8FE8 /* WEBlockOperation.h */,
+				D5BD725F1DFCE5CF00AC8FE8 /* WEBlockOperation.m */,
 			);
 			path = Operation;
 			sourceTree = "<group>";
@@ -155,6 +175,8 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D5BD72601DFCE5CF00AC8FE8 /* WEBlockOperation.h in Headers */,
+				D5BD725A1DFCE20300AC8FE8 /* WEWorkflowContext+Private.h in Headers */,
 				D5CDF76A1DE7601E009668ED /* WEOperation.h in Headers */,
 				D5CDF7721DE76A2F009668ED /* WEWorkflowContext.h in Headers */,
 				D5CDF7761DE76A60009668ED /* WEOperationResult.h in Headers */,
@@ -263,6 +285,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D5CDF76F1DE769FD009668ED /* WEWorkflow.m in Sources */,
+				D5BD72611DFCE5CF00AC8FE8 /* WEBlockOperation.m in Sources */,
 				D5CDF76B1DE7601E009668ED /* WEOperation.m in Sources */,
 				D5CDF7771DE76A60009668ED /* WEOperationResult.m in Sources */,
 				D5CDF7731DE76A2F009668ED /* WEWorkflowContext.m in Sources */,
@@ -273,6 +296,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D5BD725D1DFCE3AC00AC8FE8 /* WEWorkflowTests.m in Sources */,
 				D5BD72581DF352B700AC8FE8 /* WEOperationResultTests.m in Sources */,
 				D5B49A191DEBD24B001DCD67 /* WEOperationTests.m in Sources */,
 			);
@@ -388,6 +412,7 @@
 		D57205EA1DE23D580071E38A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CODE_SIGN_IDENTITY = "";
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -409,6 +434,7 @@
 		D57205EB1DE23D580071E38A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CODE_SIGN_IDENTITY = "";
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;

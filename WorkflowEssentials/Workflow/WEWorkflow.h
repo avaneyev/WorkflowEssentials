@@ -30,6 +30,11 @@
 @property (nonatomic, readonly, getter=isActive) BOOL active;
 
 /**
+ returns YES if the workflow has been completed, and NO otherwise
+ */
+@property (nonatomic, readonly, getter=isCompleted) BOOL completed;
+
+/**
  Workflow context, and object that stores completed operation result and arbitrary workflow context
  */
 @property (nonatomic, readonly, strong, nonnull) WEWorkflowContext *context;
