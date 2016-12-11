@@ -91,10 +91,14 @@
     [[[delegateMock expect] andDo:^(NSInvocation *invocation) {
         [expectation fulfill];
     }] workflowDidComplete:workflow];
-        
+    
     [workflow start];
     
     [self waitForExpectationsWithTimeout:1 handler:^(NSError * _Nullable error) {
+        XCTAssertTrue(firstOperation.finished);
+        XCTAssertEqual(firstOperation.result, firstResult);
+        XCTAssertTrue(secondOperation.finished);
+        XCTAssertEqual(secondOperation.result, secondResult);
         XCTAssertTrue(workflow.completed);
     }];
 }
