@@ -13,6 +13,14 @@
 @class WEWorkflowContext;
 @class WEOperation;
 
+@class WEWorkflow;
+
+@protocol WEWorkflowDelegate <NSObject>
+
+- (void)workflowDidComplete:(nonnull WEWorkflow *)workflow;
+
+@end
+
 @interface WEWorkflow : NSObject
 
 /**
@@ -22,7 +30,20 @@
  @return an instance of `WEWorkflow`
  */
 - (nonnull instancetype)initWithContextClass:(nullable Class)contextClass
-                 maximumConcurrentOperations:(NSUInteger)maximumConcurrentOperations NS_DESIGNATED_INITIALIZER;
+                 maximumConcurrentOperations:(NSUInteger)maximumConcurrentOperations;
+
+/**
+ Initialize a new workflow
+ @param contextClass a context class, which must be a subclass of `WEWorkflowContext` or `nil`
+ @param maximumConcurrentOperations maximum number of operations that may be executed concurrently
+ @param delegate workflow delegate that will be notified of certain workflow events
+ @param delegateQueue a dispatch queue to be used for sending delegate events. Must be provided when a delegate is specified.
+ @return an instance of `WEWorkflow`
+ */
+- (nonnull instancetype)initWithContextClass:(nullable Class)contextClass
+                 maximumConcurrentOperations:(NSUInteger)maximumConcurrentOperations
+                                    delegate:(nullable id<WEWorkflowDelegate>)delegate
+                               delegateQueue:(nullable dispatch_queue_t)delegateQueue NS_DESIGNATED_INITIALIZER;
 
 /**
  returns YES if the workflow is active, and NO otherwise

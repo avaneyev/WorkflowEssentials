@@ -28,6 +28,9 @@ typedef enum
     WEWorkflowContext *_context;
     NSUInteger _maximumConcurrentOperations;
     
+    __weak id<WEWorkflowDelegate> _delegate;
+    dispatch_queue_t _delegateQueue;
+    
     pthread_mutex_t _operationMutex;
     dispatch_queue_t _workflowInternalQueue;
     WEWorkflowState _state;
@@ -41,13 +44,27 @@ typedef enum
     return [self initWithContextClass:nil maximumConcurrentOperations:0];
 }
 
+
 - (instancetype)initWithContextClass:(Class)contextClass
          maximumConcurrentOperations:(NSUInteger)maximumConcurrentOperations
+{
+    return [self initWithContextClass:contextClass maximumConcurrentOperations:maximumConcurrentOperations delegate:nil delegateQueue:nil];
+}
+
+- (instancetype)initWithContextClass:(Class)contextClass
+         maximumConcurrentOperations:(NSUInteger)maximumConcurrentOperations
+                            delegate:(id<WEWorkflowDelegate>)delegate
+                       delegateQueue:(dispatch_queue_t)delegateQueue
 {
     Class defaultClass = [WEWorkflowContext class];
     if (contextClass != nil && contextClass != defaultClass && ![contextClass isSubclassOfClass:defaultClass])
     {
         THROW_INVALID_PARAM(contextClass, nil);
+    }
+    
+    if ((delegate != nil) ^ (delegateQueue != nil))
+    {
+        THROW_INVALID_PARAMS( @{ NSLocalizedDescriptionKey: @"Must provide both delegate and queue, or neither delegate nor queue" });
     }
     
     if (self = [super init])
@@ -56,6 +73,9 @@ typedef enum
         _context = [[contextClass alloc] initWithWorkflow:self];
         
         _maximumConcurrentOperations = (maximumConcurrentOperations > 0) ? maximumConcurrentOperations : INT32_MAX;
+        
+        _delegate = delegate;
+        _delegateQueue = delegateQueue;
         
         pthread_mutex_init(&_operationMutex, NULL);
         _operations = [NSMutableArray new];
@@ -272,8 +292,14 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
     _state = WEWorkflowComplete;
     
     LEAVE_CRITICAL_SECTION(self, _operationMutex)
-    
-    // TODO: notify completion?
+
+    id<WEWorkflowDelegate> delegate = _delegate;
+    if (delegate)
+    {
+        dispatch_async(_delegateQueue, ^{
+            [delegate workflowDidComplete:self];
+        });
+    }
 }
 
 @end

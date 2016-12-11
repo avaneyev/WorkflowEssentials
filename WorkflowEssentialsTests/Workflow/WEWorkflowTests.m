@@ -9,6 +9,7 @@
 //
 
 #import <XCTest/XCTest.h>
+#import <OCMock/OCMock.h>
 #import <WorkflowEssentials/WEWorkflow.h>
 #import <WorkflowEssentials/WEWorkflowContext.h>
 #import <WorkflowEssentials/WEOperation.h>
@@ -53,7 +54,9 @@
     WEOperationResult *firstResult = [[WEOperationResult alloc] initWithResult:@"result"];
     WEOperationResult *secondResult = [[WEOperationResult alloc] initWithError:[NSError errorWithDomain:@"1" code:2 userInfo:nil]];
     
-    WEWorkflow *workflow = [[WEWorkflow alloc] initWithContextClass:nil maximumConcurrentOperations:1];
+    OCMockObject<WEWorkflowDelegate> *delegateMock = [OCMockObject mockForProtocol:@protocol(WEWorkflowDelegate)];
+    
+    WEWorkflow *workflow = [[WEWorkflow alloc] initWithContextClass:nil maximumConcurrentOperations:1 delegate:delegateMock delegateQueue:dispatch_get_main_queue()];
     __unsafe_unretained __block WEBlockOperation *unsafeFirstOperation;
     __unsafe_unretained __block WEBlockOperation *unsafeSecondOperation;
     
@@ -83,14 +86,12 @@
     [workflow addOperation:firstOperation];
     [workflow addOperation:secondOperation];
     
-    NSPredicate *workflowCompletionPredicate = [NSPredicate predicateWithBlock:^BOOL(id _Nullable evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
-        if (evaluatedObject == nil || ![evaluatedObject isKindOfClass:[WEWorkflow class]]) return NO;
-        WEWorkflow *w = evaluatedObject;
-        return w.completed;
-    }];
+    XCTestExpectation *expectation = [self expectationWithDescription:@"wait until workflow completes"];
     
-    [self expectationForPredicate:workflowCompletionPredicate evaluatedWithObject:workflow handler:nil];
-    
+    [[[delegateMock expect] andDo:^(NSInvocation *invocation) {
+        [expectation fulfill];
+    }] workflowDidComplete:workflow];
+        
     [workflow start];
     
     [self waitForExpectationsWithTimeout:1 handler:^(NSError * _Nullable error) {
