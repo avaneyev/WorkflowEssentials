@@ -200,6 +200,8 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
     WEAssert(firstReadyOperation != nil);
     WEAssert(!firstReadyOperation.active && !firstReadyOperation.finished && !firstReadyOperation.cancelled);
     
+    [_activeOperations addObject:firstReadyOperation];
+    
     dispatch_queue_t operationQueue = _WEQueueForOperation(firstReadyOperation);
     
     dispatch_async(operationQueue, ^{
@@ -209,12 +211,20 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
             [self _runOperationIfStillPossible:firstReadyOperation onQueue:operationQueue];
         });
     });
+    
+    // Start operations until reached the maximum concurrent count.
+    if (_operationsReadyToExecute.count > 0)
+    {
+        [self _checkAndStartReadyOperation];
+    }
 }
 
 - (void)_runOperationIfStillPossible:(WEOperation *)operation onQueue:(dispatch_queue_t)queue
 {
     WEAssert(operation != nil);
-    WEAssert(![_activeOperations containsObject:operation]);
+    WEAssert([_activeOperations containsObject:operation]);
+    
+    // TODO: if an operation cannot run after preparation, remove it from the list of active
     
     [_activeOperations addObject:operation];
     dispatch_async(queue, ^{
@@ -227,7 +237,7 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
 - (void)_completeOperation:(WEOperation *)operation withResult:(WEOperationResult *)result
 {
     WEAssert(operation != nil);
-    WEAssert(![_activeOperations containsObject:operation]);
+    WEAssert([_activeOperations containsObject:operation]);
 
     [_activeOperations removeObject:operation];
     NSString *operationName = operation.name;

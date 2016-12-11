@@ -43,6 +43,8 @@
         XCTAssertFalse(blockOperation.active);
         XCTAssertFalse(blockOperation.cancelled);
         
+        XCTAssertEqual(result, expectedResult);
+        
         [expectation fulfill];
     } completionQueue:dispatch_get_main_queue()];
     
@@ -81,6 +83,8 @@
             XCTAssertFalse(blockOperation.active);
             XCTAssertFalse(blockOperation.cancelled);
             
+            XCTAssertEqual(result, expectedResult);
+
             [expectation fulfill];
         } completionQueue:dispatch_get_main_queue()];
     });

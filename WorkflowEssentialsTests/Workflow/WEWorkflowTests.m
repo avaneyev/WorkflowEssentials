@@ -48,4 +48,54 @@
     XCTAssertFalse(workflow.isCompleted);
 }
 
+- (void)testWorkflowSerialExecutionCompletesOperations
+{
+    WEOperationResult *firstResult = [[WEOperationResult alloc] initWithResult:@"result"];
+    WEOperationResult *secondResult = [[WEOperationResult alloc] initWithError:[NSError errorWithDomain:@"1" code:2 userInfo:nil]];
+    
+    WEWorkflow *workflow = [[WEWorkflow alloc] initWithContextClass:nil maximumConcurrentOperations:1];
+    __unsafe_unretained __block WEBlockOperation *unsafeFirstOperation;
+    __unsafe_unretained __block WEBlockOperation *unsafeSecondOperation;
+    
+    WEBlockOperation *firstOperation = [[WEBlockOperation alloc] initWithName:nil requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTAssertNotNil(unsafeSecondOperation);
+        XCTAssertFalse(unsafeSecondOperation.active);
+        XCTAssertFalse(unsafeSecondOperation.finished);
+        XCTAssertFalse(unsafeSecondOperation.cancelled);
+        
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            completion(firstResult);
+        });
+    }];
+    WEBlockOperation *secondOperation = [[WEBlockOperation alloc] initWithName:nil requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTAssertNotNil(unsafeFirstOperation);
+        XCTAssertFalse(unsafeFirstOperation.active);
+        XCTAssertFalse(unsafeSecondOperation.finished);
+
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            completion(secondResult);
+        });
+    }];
+    
+    unsafeFirstOperation = firstOperation;
+    unsafeSecondOperation = secondOperation;
+    
+    [workflow addOperation:firstOperation];
+    [workflow addOperation:secondOperation];
+    
+    NSPredicate *workflowCompletionPredicate = [NSPredicate predicateWithBlock:^BOOL(id _Nullable evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
+        if (evaluatedObject == nil || ![evaluatedObject isKindOfClass:[WEWorkflow class]]) return NO;
+        WEWorkflow *w = evaluatedObject;
+        return w.completed;
+    }];
+    
+    [self expectationForPredicate:workflowCompletionPredicate evaluatedWithObject:workflow handler:nil];
+    
+    [workflow start];
+    
+    [self waitForExpectationsWithTimeout:1 handler:^(NSError * _Nullable error) {
+        XCTAssertTrue(workflow.completed);
+    }];
+}
+
 @end
