@@ -48,6 +48,4 @@
     XCTAssertFalse(workflow.isCompleted);
 }
 
-
-
 @end

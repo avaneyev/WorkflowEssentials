@@ -27,7 +27,7 @@
 #define WEAssert(condition)                         \
 do {                                                \
     BOOL conditionResult = (condition);             \
-    if (conditionResult) {                          \
+    if (!conditionResult) {                          \
         @throw [NSException exceptionWithName:NSInternalInconsistencyException reason:[NSString stringWithFormat:@"Assertion failed in in %s: %s!",  __PRETTY_FUNCTION__, #condition] userInfo:nil];   \
     }                                               \
 } while (0)

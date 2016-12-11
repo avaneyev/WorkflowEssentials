@@ -15,6 +15,7 @@
 		D5BD725D1DFCE3AC00AC8FE8 /* WEWorkflowTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D5BD725C1DFCE3AC00AC8FE8 /* WEWorkflowTests.m */; };
 		D5BD72601DFCE5CF00AC8FE8 /* WEBlockOperation.h in Headers */ = {isa = PBXBuildFile; fileRef = D5BD725E1DFCE5CF00AC8FE8 /* WEBlockOperation.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		D5BD72611DFCE5CF00AC8FE8 /* WEBlockOperation.m in Sources */ = {isa = PBXBuildFile; fileRef = D5BD725F1DFCE5CF00AC8FE8 /* WEBlockOperation.m */; };
+		D5BD72631DFCECC000AC8FE8 /* WEBlockOperationTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D5BD72621DFCECC000AC8FE8 /* WEBlockOperationTests.m */; };
 		D5CDF76A1DE7601E009668ED /* WEOperation.h in Headers */ = {isa = PBXBuildFile; fileRef = D5CDF7681DE7601E009668ED /* WEOperation.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		D5CDF76B1DE7601E009668ED /* WEOperation.m in Sources */ = {isa = PBXBuildFile; fileRef = D5CDF7691DE7601E009668ED /* WEOperation.m */; };
 		D5CDF76E1DE769FD009668ED /* WEWorkflow.h in Headers */ = {isa = PBXBuildFile; fileRef = D5CDF76C1DE769FD009668ED /* WEWorkflow.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -48,6 +49,7 @@
 		D5BD725C1DFCE3AC00AC8FE8 /* WEWorkflowTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WEWorkflowTests.m; sourceTree = "<group>"; };
 		D5BD725E1DFCE5CF00AC8FE8 /* WEBlockOperation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WEBlockOperation.h; sourceTree = "<group>"; };
 		D5BD725F1DFCE5CF00AC8FE8 /* WEBlockOperation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WEBlockOperation.m; sourceTree = "<group>"; };
+		D5BD72621DFCECC000AC8FE8 /* WEBlockOperationTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WEBlockOperationTests.m; sourceTree = "<group>"; };
 		D5CDF7681DE7601E009668ED /* WEOperation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WEOperation.h; sourceTree = "<group>"; };
 		D5CDF7691DE7601E009668ED /* WEOperation.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WEOperation.m; sourceTree = "<group>"; };
 		D5CDF76C1DE769FD009668ED /* WEWorkflow.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WEWorkflow.h; sourceTree = "<group>"; };
@@ -121,6 +123,7 @@
 		D5B49A171DEBD225001DCD67 /* Operation */ = {
 			isa = PBXGroup;
 			children = (
+				D5BD72621DFCECC000AC8FE8 /* WEBlockOperationTests.m */,
 				D5B49A181DEBD24B001DCD67 /* WEOperationTests.m */,
 				D5BD72571DF352B700AC8FE8 /* WEOperationResultTests.m */,
 			);
@@ -297,6 +300,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D5BD725D1DFCE3AC00AC8FE8 /* WEWorkflowTests.m in Sources */,
+				D5BD72631DFCECC000AC8FE8 /* WEBlockOperationTests.m in Sources */,
 				D5BD72581DF352B700AC8FE8 /* WEOperationResultTests.m in Sources */,
 				D5B49A191DEBD24B001DCD67 /* WEOperationTests.m in Sources */,
 			);

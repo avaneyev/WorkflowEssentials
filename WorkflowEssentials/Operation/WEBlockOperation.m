@@ -29,6 +29,11 @@
     return self;
 }
 
+- (BOOL)requiresMainThread
+{
+    return _requiresMainThread;
+}
+
 - (void)start
 {
     WEAssert(_requiresMainThread == [NSThread isMainThread]);
