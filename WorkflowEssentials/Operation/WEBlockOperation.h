@@ -10,11 +10,11 @@
 
 #import <WorkflowEssentials/WEOperation.h>
 
-@interface WEBlockOperation : WEOperation
+@interface WEBlockOperation<__covariant WEResultType : id<NSCopying> > : WEOperation<WEResultType>
 
 - (nullable instancetype)init NS_UNAVAILABLE;
 - (nonnull instancetype)initWithName:(nullable NSString *)name NS_UNAVAILABLE;
 
-- (nonnull instancetype)initWithName:(nullable NSString *)name requiresMainThread:(BOOL)requiresMain block:(nonnull void (^)(void  (^ _Nonnull completion)(WEOperationResult * _Nonnull result)))block;
+- (nonnull instancetype)initWithName:(nullable NSString *)name requiresMainThread:(BOOL)requiresMain block:(nonnull void (^)(void  (^ _Nonnull completion)(WEOperationResult<WEResultType> * _Nonnull result)))block;
 
 @end

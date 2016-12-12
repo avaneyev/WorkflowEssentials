@@ -17,7 +17,7 @@
     void (^_block)(void (^ _Nonnull)(WEOperationResult * _Nonnull));
 }
 
-- (instancetype)initWithName:(NSString *)name requiresMainThread:(BOOL)requiresMain block:(nonnull void (^)(void (^ _Nonnull)(WEOperationResult * _Nonnull)))block
+- (instancetype)initWithName:(NSString *)name requiresMainThread:(BOOL)requiresMain block:(nonnull void (^)(void (^ _Nonnull)(WEOperationResult<id<NSCopying>> * _Nonnull)))block
 {
     if (block == nil) THROW_INVALID_PARAM(block, nil);
     
