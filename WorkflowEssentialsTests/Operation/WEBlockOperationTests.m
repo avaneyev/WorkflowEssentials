@@ -23,7 +23,7 @@
     
     // make a pointer to an operation to use inside a block to aboid a retain cycle.
     __unsafe_unretained __block WEBlockOperation *unsafeOperation = nil;
-    WEBlockOperation *blockOperation = [[WEBlockOperation alloc] initWithName:nil requiresMainThread:YES block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+    WEBlockOperation<NSString *> *blockOperation = [[WEBlockOperation alloc] initWithName:nil requiresMainThread:YES block:^(void (^ _Nonnull completion)(WEOperationResult<NSString *> * _Nonnull)) {
         XCTAssertTrue([NSThread isMainThread]);
         XCTAssertTrue(unsafeOperation.active);
         
@@ -38,7 +38,7 @@
 
     XCTestExpectation *expectation = [self expectationWithDescription:@"Wait for operation to complete"];
     
-    [blockOperation startWithCompletion:^(WEOperationResult * _Nullable result) {
+    [blockOperation startWithCompletion:^(WEOperationResult<NSString *> * _Nullable result) {
         XCTAssertTrue(unsafeOperation.finished);
         XCTAssertFalse(blockOperation.active);
         XCTAssertFalse(blockOperation.cancelled);
@@ -60,7 +60,7 @@
     
     // make a pointer to an operation to use inside a block to aboid a retain cycle.
     __unsafe_unretained __block WEBlockOperation *unsafeOperation = nil;
-    WEBlockOperation *blockOperation = [[WEBlockOperation alloc] initWithName:nil requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+    WEBlockOperation<NSString *> *blockOperation = [[WEBlockOperation alloc] initWithName:nil requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult<NSString *> * _Nonnull)) {
         XCTAssertFalse([NSThread isMainThread]);
         XCTAssertTrue(unsafeOperation.active);
         
@@ -78,7 +78,7 @@
     XCTestExpectation *expectation = [self expectationWithDescription:@"Wait for operation to complete"];
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        [blockOperation startWithCompletion:^(WEOperationResult * _Nullable result) {
+        [blockOperation startWithCompletion:^(WEOperationResult<NSString *> * _Nullable result) {
             XCTAssertTrue(unsafeOperation.finished);
             XCTAssertFalse(blockOperation.active);
             XCTAssertFalse(blockOperation.cancelled);
