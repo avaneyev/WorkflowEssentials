@@ -56,6 +56,10 @@
     // This test creates a serial workflow (at most one operation at a time)
     // It ensures that the workflow completes, finishes both operations
     // It also verifies that operations are performed one after another
+
+    // The test tries to push the workflow to execute in parallel through the use of semaphores,
+    // same way as in the parallel execution test, but expects that semaphore wait expires.
+    
     WEOperationResult *firstResult = [[WEOperationResult alloc] initWithResult:@"result"];
     WEOperationResult *secondResult = [[WEOperationResult alloc] initWithError:[NSError errorWithDomain:@"1" code:2 userInfo:nil]];
     
@@ -65,17 +69,28 @@
     __unsafe_unretained __block WEBlockOperation *unsafeFirstOperation;
     __unsafe_unretained __block WEBlockOperation *unsafeSecondOperation;
     
+    dispatch_semaphore_t __block firstStartSemaphore = dispatch_semaphore_create(0);
+    dispatch_semaphore_t __block secondStartSemaphore = dispatch_semaphore_create(0);
+    uint64_t delay = (uint64_t)(200 * NSEC_PER_MSEC);
+
     WEBlockOperation *firstOperation = [[WEBlockOperation alloc] initWithName:nil requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
         XCTAssertNotNil(unsafeSecondOperation);
         XCTAssertFalse(unsafeSecondOperation.active);
         XCTAssertFalse(unsafeSecondOperation.finished);
         XCTAssertFalse(unsafeSecondOperation.cancelled);
-        
+
+        dispatch_semaphore_signal(firstStartSemaphore);
+        long result = dispatch_semaphore_wait(secondStartSemaphore, dispatch_time(DISPATCH_TIME_NOW, delay));
+        XCTAssertNotEqual(result, 0);
+
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             completion(firstResult);
         });
     }];
     WEBlockOperation *secondOperation = [[WEBlockOperation alloc] initWithName:nil requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        
+        dispatch_semaphore_signal(secondStartSemaphore);
+
         XCTAssertNotNil(unsafeFirstOperation);
         XCTAssertFalse(unsafeFirstOperation.active);
         XCTAssertTrue(unsafeFirstOperation.finished);
