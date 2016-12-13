@@ -16,6 +16,7 @@ FOUNDATION_EXPORT double WorkflowEssentialsVersionNumber;
 //! Project version string for WorkflowEssentials.
 FOUNDATION_EXPORT const unsigned char WorkflowEssentialsVersionString[];
 
+#import <WorkflowEssentials/WEBlockOperation.h>
 #import <WorkflowEssentials/WEOperation.h>
 #import <WorkflowEssentials/WEOperationResult.h>
 #import <WorkflowEssentials/WEWorkflow.h>

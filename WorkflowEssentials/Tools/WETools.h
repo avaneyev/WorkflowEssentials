@@ -23,6 +23,18 @@
 #define THROW_INVALID_PARAMS(info) @throw [NSException exceptionWithName:NSInvalidArgumentException reason:[NSString stringWithFormat:@"%s received invalid parameters!",  __PRETTY_FUNCTION__] userInfo:(info)]
 #define THROW_INVALID_PARAM(param, info) @throw [NSException exceptionWithName:NSInvalidArgumentException reason:[NSString stringWithFormat:@"%s received invalid %s",  __PRETTY_FUNCTION__, #param] userInfo:(info)]
 
+#ifdef DEBUG
+#define WEAssert(condition)                         \
+do {                                                \
+    BOOL conditionResult = (condition);             \
+    if (!conditionResult) {                          \
+        @throw [NSException exceptionWithName:NSInternalInconsistencyException reason:[NSString stringWithFormat:@"Assertion failed in in %s: %s!",  __PRETTY_FUNCTION__, #condition] userInfo:nil];   \
+    }                                               \
+} while (0)
+#else
+#define WEAssert(condition)
+#endif
+
 // Pair of macros to enter and leave the critical section
 #define ENTER_CRITICAL_SECTION(object, mutex)       \
 @try                                                \
