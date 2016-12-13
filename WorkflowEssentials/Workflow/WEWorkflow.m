@@ -153,16 +153,23 @@ typedef enum
 
 - (void)start
 {
+    BOOL start = NO;
     ENTER_CRITICAL_SECTION(self, _operationMutex)
     if (_state == WEWorkflowInactive)
     {
         _workflowInternalQueue = dispatch_queue_create("we-workflow.queue", DISPATCH_QUEUE_SERIAL);
         _state = WEWorkflowActive;
+        start = YES;
+    }
+    LEAVE_CRITICAL_SECTION(self, _operationMutex)
+    
+    // dispatch outside of a critical section to avoid possible contention over the lock if queue qob is picked up quickly.
+    if (start)
+    {
         dispatch_async(_workflowInternalQueue, ^{
             [self _prepareAndStartWorkflow];
         });
     }
-    LEAVE_CRITICAL_SECTION(self, _operationMutex)
 }
 
 #pragma mark - Workflow internals
