@@ -12,4 +12,13 @@
 
 @implementation WESegueDescription
 
+@synthesize condition = _condition;
+
+- (id)copyWithZone:(NSZone *)zone
+{
+    WESegueDescription *copy = [super copyWithZone:zone];
+    copy->_condition = [_condition copyWithZone:zone];
+    return copy;
+}
+
 @end

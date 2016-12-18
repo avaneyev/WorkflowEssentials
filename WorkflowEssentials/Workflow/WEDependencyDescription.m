@@ -12,19 +12,4 @@
 
 @implementation WEDependencyDescription
 
-@synthesize sourceOperation = _sourceOperation,
-    sourceOperationName = _sourceOperationName,
-    dependentOperation = _dependentOperation,
-    dependentOperationName = _dependentOperationName;
-
-- (id)copyWithZone:(NSZone *)zone
-{
-    WEDependencyDescription *copy = [[[self class] allocWithZone:zone] init];
-    copy->_dependentOperation = _dependentOperation;
-    copy->_dependentOperationName = [_dependentOperationName copyWithZone:zone];
-    copy->_sourceOperation = _sourceOperation;
-    copy->_dependentOperationName = [_sourceOperationName copyWithZone:zone];
-    return copy;
-}
-
 @end
