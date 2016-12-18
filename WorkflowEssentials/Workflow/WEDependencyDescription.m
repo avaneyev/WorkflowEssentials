@@ -19,7 +19,7 @@
 
 - (id)copyWithZone:(NSZone *)zone
 {
-    WEDependencyDescription *copy = [[WEDependencyDescription allocWithZone:zone] init];
+    WEDependencyDescription *copy = [[[self class] allocWithZone:zone] init];
     copy->_dependentOperation = _dependentOperation;
     copy->_dependentOperationName = [_dependentOperationName copyWithZone:zone];
     copy->_sourceOperation = _sourceOperation;
