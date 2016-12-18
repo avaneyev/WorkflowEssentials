@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D50F35A91E062D950076A465 /* WEDependencyDescription.h in Headers */ = {isa = PBXBuildFile; fileRef = D50F35A71E062D950076A465 /* WEDependencyDescription.h */; };
+		D50F35AA1E062D950076A465 /* WEDependencyDescription.m in Sources */ = {isa = PBXBuildFile; fileRef = D50F35A81E062D950076A465 /* WEDependencyDescription.m */; };
 		D57205DF1DE23D580071E38A /* WorkflowEssentials.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D57205D51DE23D580071E38A /* WorkflowEssentials.framework */; };
 		D57205E61DE23D580071E38A /* WorkflowEssentials.h in Headers */ = {isa = PBXBuildFile; fileRef = D57205D81DE23D580071E38A /* WorkflowEssentials.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		D5B49A191DEBD24B001DCD67 /* WEOperationTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D5B49A181DEBD24B001DCD67 /* WEOperationTests.m */; };
@@ -40,6 +42,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		D50F35A71E062D950076A465 /* WEDependencyDescription.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WEDependencyDescription.h; sourceTree = "<group>"; };
+		D50F35A81E062D950076A465 /* WEDependencyDescription.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WEDependencyDescription.m; sourceTree = "<group>"; };
 		D57205D51DE23D580071E38A /* WorkflowEssentials.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = WorkflowEssentials.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D57205D81DE23D580071E38A /* WorkflowEssentials.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WorkflowEssentials.h; sourceTree = "<group>"; };
 		D57205D91DE23D580071E38A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -187,6 +191,8 @@
 				D5CDF7701DE76A2F009668ED /* WEWorkflowContext.h */,
 				D5BD72591DFCE15900AC8FE8 /* WEWorkflowContext+Private.h */,
 				D5CDF7711DE76A2F009668ED /* WEWorkflowContext.m */,
+				D50F35A71E062D950076A465 /* WEDependencyDescription.h */,
+				D50F35A81E062D950076A465 /* WEDependencyDescription.m */,
 			);
 			path = Workflow;
 			sourceTree = "<group>";
@@ -226,6 +232,7 @@
 				D5CDF7761DE76A60009668ED /* WEOperationResult.h in Headers */,
 				D5CDF76E1DE769FD009668ED /* WEWorkflow.h in Headers */,
 				D5CDF77A1DE76C4E009668ED /* WETools.h in Headers */,
+				D50F35A91E062D950076A465 /* WEDependencyDescription.h in Headers */,
 				D57205E61DE23D580071E38A /* WorkflowEssentials.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -275,7 +282,7 @@
 		D57205CC1DE23D580071E38A /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0810;
+				LastUpgradeCheck = 0820;
 				ORGANIZATIONNAME = ServiceEssentials;
 				TargetAttributes = {
 					D57205D41DE23D580071E38A = {
@@ -330,6 +337,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D5CDF76F1DE769FD009668ED /* WEWorkflow.m in Sources */,
+				D50F35AA1E062D950076A465 /* WEDependencyDescription.m in Sources */,
 				D5BD72611DFCE5CF00AC8FE8 /* WEBlockOperation.m in Sources */,
 				D5CDF76B1DE7601E009668ED /* WEOperation.m in Sources */,
 				D5CDF7771DE76A60009668ED /* WEOperationResult.m in Sources */,
@@ -377,6 +385,7 @@
 				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_SUSPICIOUS_MOVES = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
@@ -428,6 +437,7 @@
 				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_SUSPICIOUS_MOVES = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
