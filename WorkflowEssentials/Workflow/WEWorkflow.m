@@ -9,8 +9,11 @@
 //
 
 #import <WorkflowEssentials/WEWorkflow.h>
-#import <WorkflowEssentials/WEWorkflowContext.h>
+
+#import <WorkflowEssentials/WEDependencyDescription.h>
 #import <WorkflowEssentials/WEOperation.h>
+#import <WorkflowEssentials/WESegueDescription.h>
+#import <WorkflowEssentials/WEWorkflowContext.h>
 
 #import <pthread.h>
 #import "WETools.h"
@@ -37,6 +40,7 @@ typedef enum
     NSMutableArray<WEOperation *> *_operations;
     NSMutableOrderedSet<WEOperation *> *_operationsReadyToExecute;
     NSMutableSet<WEOperation *> *_activeOperations;
+    NSMutableArray<WEDependencyDescription *> *_dependencies;
 }
 
 - (instancetype)init
@@ -79,6 +83,7 @@ typedef enum
         
         pthread_mutex_init(&_operationMutex, NULL);
         _operations = [NSMutableArray new];
+        _dependencies = [NSMutableArray new];
     }
     return self;
 }
@@ -145,6 +150,38 @@ typedef enum
     
     [_operations addObject:operation];
     
+    LEAVE_CRITICAL_SECTION(self, _operationMutex)
+}
+
+- (void)addDependency:(WEDependencyDescription *)dependency
+{
+    if (dependency == nil) THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Dependency not specified" });
+    if (dependency.sourceOperation == nil && dependency.sourceOperationName == nil) THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Source operation not specified" });
+    if (dependency.targetOperation == nil && dependency.targetOperationName == nil) THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Target operation not specified" });
+    
+    ENTER_CRITICAL_SECTION(self, _operationMutex)
+
+    if (_state != WEWorkflowInactive)
+    {
+        THROW_INCONSISTENCY(@{ NSLocalizedDescriptionKey: @"Cannot directly add a dependency after the workflow had started." });
+    }
+    
+    // Verify that explicitly specified operations belong to the workflow
+    WEOperation *sourceOperation = dependency.sourceOperation;
+    if (sourceOperation != nil && ![_operations containsObject:sourceOperation])
+    {
+        THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Source operation does not belong to the workflow" });
+    }
+    WEOperation *targetOperation = dependency.targetOperation;
+    if (targetOperation != nil && ![_operations containsObject:targetOperation])
+    {
+        THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Target operation does not belong to the workflow" });
+    }
+    
+    // TODO: Verify there are no obvious duplicates or two-way (deadlock) dependencies.
+    
+    [_dependencies addObject:[dependency copy]];
+
     LEAVE_CRITICAL_SECTION(self, _operationMutex)
 }
 

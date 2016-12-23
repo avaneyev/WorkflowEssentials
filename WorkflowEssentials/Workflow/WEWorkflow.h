@@ -12,6 +12,7 @@
 
 @class WEWorkflowContext;
 @class WEOperation;
+@class WEDependencyDescription;
 
 @class WEWorkflow;
 
@@ -72,8 +73,17 @@
 
 /**
  Adds a single operation
+ @param operation an operation to add
  */
 - (void)addOperation:(nonnull WEOperation *)operation;
+
+/**
+ Add a dependency. Specifies that one operation depends on another.
+ @param dependency describes the dependency to be added.
+ @discussion dependency description will go through a set of quick sanity checks before being added.
+ Dependency will be copied by the workflow.
+ */
+- (void)addDependency:(nonnull WEDependencyDescription *)dependency;
 
 /**
  Starts executing the workflow
