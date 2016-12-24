@@ -26,6 +26,42 @@ typedef enum
     WEWorkflowComplete
 } WEWorkflowState;
 
+@interface _WEOperationState : NSObject
+- (instancetype)init NS_UNAVAILABLE;
+- (instancetype)initWithOperation:(nonnull WEOperation *)operation NS_DESIGNATED_INITIALIZER;
+
+@property (nonatomic, readonly, assign, nonnull) WEOperation *operation;
+@property (nonatomic, readonly, strong, nonnull) NSHashTable<_WEOperationState *> *dependsOn;
+@property (nonatomic, readonly, strong, nonnull) NSHashTable<_WEOperationState *> *dependents;
+@end
+
+@implementation _WEOperationState
+{
+    __unsafe_unretained WEOperation *_operation;
+    NSHashTable *_dependsOn;
+    NSHashTable *_dependents;
+}
+
+@synthesize operation = _operation,
+    dependsOn = _dependsOn,
+    dependents = _dependents;
+
+- (instancetype)initWithOperation:(WEOperation *)operation
+{
+    WEAssert(operation != nil);
+    
+    if (self = [super init])
+    {
+        _operation = operation;
+        NSPointerFunctionsOptions options = NSPointerFunctionsWeakMemory | NSPointerFunctionsObjectPointerPersonality;
+        _dependsOn = [[NSHashTable alloc] initWithOptions:options capacity:2];
+        _dependents = [[NSHashTable alloc] initWithOptions:options capacity:2];
+    }
+    return self;
+}
+
+@end
+
 @implementation WEWorkflow
 {
     WEWorkflowContext *_context;
@@ -178,8 +214,6 @@ typedef enum
         THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Target operation does not belong to the workflow" });
     }
     
-    // TODO: Verify there are no obvious duplicates or two-way (deadlock) dependencies.
-    
     [_dependencies addObject:[dependency copy]];
 
     LEAVE_CRITICAL_SECTION(self, _operationMutex)
@@ -217,11 +251,13 @@ typedef enum
     // Will change later.
     
     NSArray<WEOperation *> *operations;
+    NSArray<WEDependencyDescription *> *dependencies;
     ENTER_CRITICAL_SECTION(self, _operationMutex)
     
     WEAssert(_state == WEWorkflowActive);
     
     operations = [_operations copy];
+    dependencies = [_dependencies copy];
     LEAVE_CRITICAL_SECTION(self, _operationMutex)
     
     if (operations.count == 0)
@@ -234,6 +270,24 @@ typedef enum
         _activeOperations = [[NSMutableSet alloc] initWithCapacity:_maximumConcurrentOperations];
         [self _checkAndStartReadyOperation];
     }
+}
+
+- (NSError *)_buildDependencyGraphWithOperations:(NSArray<WEOperation *> *)operations dependencies:(NSArray<WEDependencyDescription *> *)dependencies
+{
+    NSMutableArray<_WEOperationState *> *operationStates = [[NSMutableArray alloc] initWithCapacity:operations.count];
+    NSMutableDictionary<NSString *, _WEOperationState *> *namedOperations = [NSMutableDictionary new];
+    for (WEOperation *operation in operations)
+    {
+        _WEOperationState *state = [[_WEOperationState alloc] initWithOperation:operation];
+        [operationStates addObject:state];
+        
+        NSString *name = operation.name;
+        if (name != nil) [namedOperations setObject:state forKey:name];
+    }
+    
+//    NSMutableSet *independentOperations = [[NSMutableSet alloc] initWithArray:operationStates];
+    
+    return nil;
 }
 
 static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperation *operation)
