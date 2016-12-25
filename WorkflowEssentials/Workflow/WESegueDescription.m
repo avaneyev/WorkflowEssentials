@@ -8,7 +8,7 @@
 //  Distributed under BSD license. See LICENSE for details.
 //
 
-#import "WESegueDescription.h"
+#import <WorkflowEssentials/WESegueDescription.h>
 
 @implementation WESegueDescription
 

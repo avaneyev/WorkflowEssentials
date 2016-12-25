@@ -26,6 +26,10 @@ typedef enum
     WEWorkflowComplete
 } WEWorkflowState;
 
+NSString *const _Nonnull WEWorkflowErrorDomain = @"WEWorkflowErrorDomain";
+NSInteger const WEWorkflowInvalidDependency = -10001;
+NSInteger const WEWorkflowDependencyCycle = -10002;
+
 @interface _WEOperationState : NSObject
 - (instancetype)init NS_UNAVAILABLE;
 - (instancetype)initWithOperation:(nonnull WEOperation *)operation NS_DESIGNATED_INITIALIZER;
@@ -37,6 +41,7 @@ typedef enum
 
 @implementation _WEOperationState
 {
+@package
     __unsafe_unretained WEOperation *_operation;
     NSHashTable *_dependsOn;
     NSHashTable *_dependents;
@@ -272,22 +277,93 @@ typedef enum
     }
 }
 
+static _WEOperationState *_FindOperationState(
+                                              NSMutableArray<_WEOperationState *> *operationStates,
+                                              NSMutableDictionary<NSString *, _WEOperationState *> *namedOperations,
+                                              WEOperation *operation,
+                                              NSString *operationName
+                                              )
+{
+    _WEOperationState *state;
+    if (operation == nil)
+    {
+        state = [namedOperations objectForKey:operationName];
+    }
+    else
+    {
+        for (_WEOperationState *otherState in operationStates)
+        {
+            if (otherState->_operation == operation)
+            {
+                state = otherState;
+                break;
+            }
+        }
+    }
+    return state;
+}
+
 - (NSError *)_buildDependencyGraphWithOperations:(NSArray<WEOperation *> *)operations dependencies:(NSArray<WEDependencyDescription *> *)dependencies
 {
+    NSError *error = nil;
     NSMutableArray<_WEOperationState *> *operationStates = [[NSMutableArray alloc] initWithCapacity:operations.count];
     NSMutableDictionary<NSString *, _WEOperationState *> *namedOperations = [NSMutableDictionary new];
+    NSString *name;
     for (WEOperation *operation in operations)
     {
         _WEOperationState *state = [[_WEOperationState alloc] initWithOperation:operation];
         [operationStates addObject:state];
         
-        NSString *name = operation.name;
+        name = operation.name;
         if (name != nil) [namedOperations setObject:state forKey:name];
     }
     
-//    NSMutableSet *independentOperations = [[NSMutableSet alloc] initWithArray:operationStates];
+    NSMutableSet *independentOperations = [[NSMutableSet alloc] initWithArray:operationStates];
     
-    return nil;
+    for (WEDependencyDescription *dependency in dependencies)
+    {
+        _WEOperationState *fromState = _FindOperationState(operationStates, namedOperations, dependency.sourceOperation, dependency.sourceOperationName);
+        _WEOperationState *toState = _FindOperationState(operationStates, namedOperations, dependency.targetOperation, dependency.targetOperationName);
+        
+        if (fromState == nil || toState == nil)
+        {
+            NSString *reason = [NSString stringWithFormat:@"Invalid dependency %@: from %@ to %@.", dependency, fromState ? @"valid" : @"invalid", toState ? @"valid" : @"invalid"];
+            error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowInvalidDependency userInfo:@{ NSLocalizedDescriptionKey: reason }];
+            break;
+        }
+        
+        // Check if dependency is not a duplicate, if it is - ignore
+        if (![fromState->_dependents containsObject:toState])
+        {
+            if ([toState->_dependents containsObject:fromState])
+            {
+                // Deadlock, create an error and stop
+                NSString *reason = [NSString stringWithFormat:@"Dependency %@ will introduce a deadlock because reverse dependency is already defined.", dependency];
+                error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowDependencyCycle userInfo:@{ NSLocalizedDescriptionKey: reason }];
+                break;
+            }
+            
+            [toState->_dependsOn addObject:fromState];
+            [fromState->_dependents addObject:toState];
+            [independentOperations removeObject:toState];
+        }
+    }
+    
+    if (error == nil)
+    {
+        if (independentOperations.count == 0)
+        {
+            // No independent operations means that each operation depends on at least another one, and nothing can start.
+            NSString *reason = @"Every operation in the workflow depends on at least one other operation. No operations are ready to start.";
+            error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowDependencyCycle userInfo:@{ NSLocalizedDescriptionKey: reason }];
+        }
+        else
+        {
+            // Perform a more complex check for cycles
+        }
+    }
+    
+    return error;
 }
 
 static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperation *operation)

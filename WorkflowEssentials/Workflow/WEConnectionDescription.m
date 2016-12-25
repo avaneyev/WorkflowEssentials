@@ -8,7 +8,7 @@
 //  Distributed under BSD license. See LICENSE for details.
 //
 
-#import "WEConnectionDescription.h"
+#import <WorkflowEssentials/WEConnectionDescription.h>
 
 @implementation WEConnectionDescription
 
@@ -25,6 +25,25 @@
     copy->_targetOperation = _targetOperation;
     copy->_targetOperationName = [_targetOperationName copyWithZone:zone];
     return copy;
+}
+
+static NSString *_DescriptionForOperationOrName(WEOperation *operation, NSString *name)
+{
+    if (operation != nil) return [NSString stringWithFormat:@"%@", operation];
+    return [NSString stringWithFormat:@"(named = %@)", name];
+}
+
+- (NSString *)description
+{
+    NSMutableString *result = [[NSMutableString alloc] initWithFormat:@"<%@(%p), from = %@, to = %@>",
+                               NSStringFromClass([self class]),
+                               self,
+                               _DescriptionForOperationOrName(_sourceOperation, _sourceOperationName),
+                               _DescriptionForOperationOrName(_targetOperation, _targetOperationName)
+                               ];
+    
+    
+    return result;
 }
 
 @end

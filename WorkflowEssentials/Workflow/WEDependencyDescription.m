@@ -8,7 +8,7 @@
 //  Distributed under BSD license. See LICENSE for details.
 //
 
-#import "WEDependencyDescription.h"
+#import <WorkflowEssentials/WEDependencyDescription.h>
 
 @implementation WEDependencyDescription
 

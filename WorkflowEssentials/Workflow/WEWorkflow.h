@@ -16,6 +16,9 @@
 
 @class WEWorkflow;
 
+FOUNDATION_EXPORT NSString *const _Nonnull WEWorkflowErrorDomain;
+FOUNDATION_EXPORT NSInteger const WEWorkflowInvalidDependency;
+
 @protocol WEWorkflowDelegate <NSObject>
 
 - (void)workflowDidComplete:(nonnull WEWorkflow *)workflow;
