@@ -79,9 +79,9 @@ NSInteger const WEWorkflowDependencyCycle = -10002;
     dispatch_queue_t _workflowInternalQueue;
     WEWorkflowState _state;
     NSMutableArray<WEOperation *> *_operations;
-    NSMutableOrderedSet<WEOperation *> *_operationsReadyToExecute;
-    NSMutableSet<WEOperation *> *_activeOperations;
     NSMutableArray<WEDependencyDescription *> *_dependencies;
+    NSMutableOrderedSet<_WEOperationState *> *_operationsReadyToExecute;
+    NSMutableSet<_WEOperationState *> *_activeOperations;
 }
 
 - (instancetype)init
@@ -271,9 +271,16 @@ NSInteger const WEWorkflowDependencyCycle = -10002;
     }
     else
     {
-        _operationsReadyToExecute = [[NSMutableOrderedSet alloc] initWithArray:operations];
-        _activeOperations = [[NSMutableSet alloc] initWithCapacity:_maximumConcurrentOperations];
-        [self _checkAndStartReadyOperation];
+        NSError *error = [self _buildDependencyGraphWithOperations:operations dependencies:dependencies];
+        if (error == nil)
+        {
+            _activeOperations = [[NSMutableSet alloc] initWithCapacity:_maximumConcurrentOperations];
+            [self _checkAndStartReadyOperation];
+        }
+        else
+        {
+            // TODO: complete workflow with error
+        }
     }
 }
 
@@ -318,7 +325,7 @@ static _WEOperationState *_FindOperationState(
         if (name != nil) [namedOperations setObject:state forKey:name];
     }
     
-    NSMutableSet *independentOperations = [[NSMutableSet alloc] initWithArray:operationStates];
+    NSMutableOrderedSet *independentOperations = [[NSMutableOrderedSet alloc] initWithArray:operationStates];
     
     for (WEDependencyDescription *dependency in dependencies)
     {
@@ -359,7 +366,8 @@ static _WEOperationState *_FindOperationState(
         }
         else
         {
-            // Perform a more complex check for cycles
+            // TODO: Perform a more complex check for cycles
+            _operationsReadyToExecute = independentOperations;
         }
     }
     
@@ -389,18 +397,20 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
     // Only proceed if had not reached maximum number of operations allowed.
     if (_maximumConcurrentOperations > 0 && _activeOperations.count >= _maximumConcurrentOperations) return;
     
-    WEOperation *firstReadyOperation = _operationsReadyToExecute.firstObject;
+    _WEOperationState *firstReadyOperation = _operationsReadyToExecute.firstObject;
     [_operationsReadyToExecute removeObject:firstReadyOperation];
     WEAssert(firstReadyOperation != nil);
-    WEAssert(!firstReadyOperation.active && !firstReadyOperation.finished && !firstReadyOperation.cancelled);
+    
+    WEOperation *operation = firstReadyOperation->_operation;
+    WEAssert(!operation.active && !operation.finished && !operation.cancelled);
     
     [_activeOperations addObject:firstReadyOperation];
     
-    dispatch_queue_t operationQueue = _WEQueueForOperation(firstReadyOperation);
+    dispatch_queue_t operationQueue = _WEQueueForOperation(operation);
     
     dispatch_async(operationQueue, ^{
         // TODO: pass explicit builder as the only facility an operation can amend the workflow.
-        [firstReadyOperation prepareForExecutionWithContext:self->_context];
+        [operation prepareForExecutionWithContext:self->_context];
         dispatch_async(self->_workflowInternalQueue, ^{
             [self _runOperationIfStillPossible:firstReadyOperation onQueue:operationQueue];
         });
@@ -413,28 +423,27 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
     }
 }
 
-- (void)_runOperationIfStillPossible:(WEOperation *)operation onQueue:(dispatch_queue_t)queue
+- (void)_runOperationIfStillPossible:(_WEOperationState *)operationState onQueue:(dispatch_queue_t)queue
 {
-    WEAssert(operation != nil);
-    WEAssert([_activeOperations containsObject:operation]);
+    WEAssert(operationState != nil);
+    WEAssert([_activeOperations containsObject:operationState]);
     
     // TODO: if an operation cannot run after preparation, remove it from the list of active
     
-    [_activeOperations addObject:operation];
     dispatch_async(queue, ^{
-        [operation startWithCompletion:^(WEOperationResult * _Nullable result) {
-            [self _completeOperation:operation withResult:result];
+        [operationState->_operation startWithCompletion:^(WEOperationResult * _Nullable result) {
+            [self _completeOperation:operationState withResult:result];
         } completionQueue:self->_workflowInternalQueue];
     });
 }
 
-- (void)_completeOperation:(WEOperation *)operation withResult:(WEOperationResult *)result
+- (void)_completeOperation:(_WEOperationState *)operationState withResult:(WEOperationResult *)result
 {
-    WEAssert(operation != nil);
-    WEAssert([_activeOperations containsObject:operation]);
+    WEAssert(operationState != nil);
+    WEAssert([_activeOperations containsObject:operationState]);
 
-    [_activeOperations removeObject:operation];
-    NSString *operationName = operation.name;
+    [_activeOperations removeObject:operationState];
+    NSString *operationName = operationState->_operation.name;
     if (operationName != nil)
     {
         [_context _setOperationResult:result forOperationName:operationName];

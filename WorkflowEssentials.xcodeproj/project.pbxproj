@@ -7,13 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		D50F35A91E062D950076A465 /* WEDependencyDescription.h in Headers */ = {isa = PBXBuildFile; fileRef = D50F35A71E062D950076A465 /* WEDependencyDescription.h */; };
+		D50F35A91E062D950076A465 /* WEDependencyDescription.h in Headers */ = {isa = PBXBuildFile; fileRef = D50F35A71E062D950076A465 /* WEDependencyDescription.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		D50F35AA1E062D950076A465 /* WEDependencyDescription.m in Sources */ = {isa = PBXBuildFile; fileRef = D50F35A81E062D950076A465 /* WEDependencyDescription.m */; };
-		D50F35AD1E063DB60076A465 /* WESegueDescription.h in Headers */ = {isa = PBXBuildFile; fileRef = D50F35AB1E063DB60076A465 /* WESegueDescription.h */; };
+		D50F35AD1E063DB60076A465 /* WESegueDescription.h in Headers */ = {isa = PBXBuildFile; fileRef = D50F35AB1E063DB60076A465 /* WESegueDescription.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		D50F35AE1E063DB60076A465 /* WESegueDescription.m in Sources */ = {isa = PBXBuildFile; fileRef = D50F35AC1E063DB60076A465 /* WESegueDescription.m */; };
 		D57205DF1DE23D580071E38A /* WorkflowEssentials.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D57205D51DE23D580071E38A /* WorkflowEssentials.framework */; };
 		D57205E61DE23D580071E38A /* WorkflowEssentials.h in Headers */ = {isa = PBXBuildFile; fileRef = D57205D81DE23D580071E38A /* WorkflowEssentials.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		D5A238CD1E07113B00FCE610 /* WEConnectionDescription.h in Headers */ = {isa = PBXBuildFile; fileRef = D5A238CB1E07113B00FCE610 /* WEConnectionDescription.h */; };
+		D5A238CD1E07113B00FCE610 /* WEConnectionDescription.h in Headers */ = {isa = PBXBuildFile; fileRef = D5A238CB1E07113B00FCE610 /* WEConnectionDescription.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		D5A238CE1E07113B00FCE610 /* WEConnectionDescription.m in Sources */ = {isa = PBXBuildFile; fileRef = D5A238CC1E07113B00FCE610 /* WEConnectionDescription.m */; };
 		D5B49A191DEBD24B001DCD67 /* WEOperationTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D5B49A181DEBD24B001DCD67 /* WEOperationTests.m */; };
 		D5BD72581DF352B700AC8FE8 /* WEOperationResultTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D5BD72571DF352B700AC8FE8 /* WEOperationResultTests.m */; };
