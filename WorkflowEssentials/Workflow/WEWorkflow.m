@@ -29,6 +29,7 @@ typedef enum
 NSString *const _Nonnull WEWorkflowErrorDomain = @"WEWorkflowErrorDomain";
 NSInteger const WEWorkflowInvalidDependency = -10001;
 NSInteger const WEWorkflowDependencyCycle = -10002;
+NSInteger const WEWorkflowDeadlocked = -10003;
 
 @interface _WEOperationState : NSObject
 - (instancetype)init NS_UNAVAILABLE;
@@ -45,6 +46,7 @@ NSInteger const WEWorkflowDependencyCycle = -10002;
     __unsafe_unretained WEOperation *_operation;
     NSHashTable *_dependsOn;
     NSHashTable *_dependents;
+    NSUInteger _completedDependsOnOperations;
 }
 
 @synthesize operation = _operation,
@@ -78,8 +80,11 @@ NSInteger const WEWorkflowDependencyCycle = -10002;
     pthread_mutex_t _operationMutex;
     dispatch_queue_t _workflowInternalQueue;
     WEWorkflowState _state;
+    NSError *_error;
     NSMutableArray<WEOperation *> *_operations;
     NSMutableArray<WEDependencyDescription *> *_dependencies;
+    NSArray<_WEOperationState *> *_allOperationStates;
+    NSUInteger _totalCompletedOperations;
     NSMutableOrderedSet<_WEOperationState *> *_operationsReadyToExecute;
     NSMutableSet<_WEOperationState *> *_activeOperations;
 }
@@ -88,7 +93,6 @@ NSInteger const WEWorkflowDependencyCycle = -10002;
 {
     return [self initWithContextClass:nil maximumConcurrentOperations:0];
 }
-
 
 - (instancetype)initWithContextClass:(Class)contextClass
          maximumConcurrentOperations:(NSUInteger)maximumConcurrentOperations
@@ -155,6 +159,24 @@ NSInteger const WEWorkflowDependencyCycle = -10002;
     isCompleted = _state == WEWorkflowComplete;
     LEAVE_CRITICAL_SECTION(self, _operationMutex)
     return isCompleted;
+}
+
+- (BOOL)isFailed
+{
+    BOOL isFailed = NO;
+    ENTER_CRITICAL_SECTION(self, _operationMutex)
+    isFailed = _state == WEWorkflowComplete && _error != nil;
+    LEAVE_CRITICAL_SECTION(self, _operationMutex)
+    return isFailed;
+}
+
+- (NSError *)error
+{
+    NSError *error;
+    ENTER_CRITICAL_SECTION(self, _operationMutex)
+    error = _error;
+    LEAVE_CRITICAL_SECTION(self, _operationMutex)
+    return error;
 }
 
 - (NSArray<WEOperation *> *)operations
@@ -274,6 +296,7 @@ NSInteger const WEWorkflowDependencyCycle = -10002;
         NSError *error = [self _buildDependencyGraphWithOperations:operations dependencies:dependencies];
         if (error == nil)
         {
+            _totalCompletedOperations = 0;
             _activeOperations = [[NSMutableSet alloc] initWithCapacity:_maximumConcurrentOperations];
             [self _checkAndStartReadyOperation];
         }
@@ -325,6 +348,7 @@ static _WEOperationState *_FindOperationState(
         if (name != nil) [namedOperations setObject:state forKey:name];
     }
     
+    _allOperationStates = [operationStates copy];
     NSMutableOrderedSet *independentOperations = [[NSMutableOrderedSet alloc] initWithArray:operationStates];
     
     for (WEDependencyDescription *dependency in dependencies)
@@ -440,6 +464,10 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
 - (void)_completeOperation:(_WEOperationState *)operationState withResult:(WEOperationResult *)result
 {
     WEAssert(operationState != nil);
+    _totalCompletedOperations++;
+    
+    // TODO: if the workflow had failed already, don't proceed.
+    
     WEAssert([_activeOperations containsObject:operationState]);
 
     [_activeOperations removeObject:operationState];
@@ -448,15 +476,34 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
     {
         [_context _setOperationResult:result forOperationName:operationName];
     }
+
+    // check if any operations depending on the one just completed can now run
+    for (_WEOperationState *dependent in operationState->_dependents)
+    {
+        NSUInteger completed = ++(dependent->_completedDependsOnOperations);
+        NSUInteger totalDependsOn = dependent->_dependsOn.count;
+        WEAssert(completed <= totalDependsOn);
+        if (completed == totalDependsOn)
+        {
+            [_operationsReadyToExecute addObject:dependent];
+        }
+    }
     
     // check if workflow is complete.
-    // for now, since all operations are immediately ready, only check if something is active or waiting
-    
-    // TODO: check if any operations depending on the one just completed can now run
     
     if (_activeOperations.count == 0 && _operationsReadyToExecute.count == 0)
     {
-        [self _completeWorkflow];
+        if (_totalCompletedOperations < _allOperationStates.count)
+        {
+            // TODO: with segues, this may not be an error anymore, revisit.
+            NSString *reason = [NSString stringWithFormat:@"Workflow %@ cannot proceed: completed %li of %li operations, but no operations are ready for execution or active.", self, (long)_totalCompletedOperations, (long)_allOperationStates.count];
+            NSError *error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowDeadlocked userInfo:@{ NSLocalizedDescriptionKey: reason }];
+            [self _completeWorkflowWithError:error];
+        }
+        else
+        {
+            [self _completeWorkflow];
+        }
     }
     else if (_operationsReadyToExecute.count > 0)
     {
@@ -464,10 +511,20 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
     }
 }
 
+- (void)_commonCompletion
+{
+    _allOperationStates = nil;
+    _totalCompletedOperations = 0;
+    _operationsReadyToExecute = nil;
+    _activeOperations = nil;
+}
+
 - (void)_completeWorkflow
 {
     WEAssert(_activeOperations.count == 0);
     WEAssert(_operationsReadyToExecute.count == 0);
+    
+    [self _commonCompletion];
     
     ENTER_CRITICAL_SECTION(self, _operationMutex)
     
@@ -481,6 +538,29 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
     {
         dispatch_async(_delegateQueue, ^{
             [delegate workflowDidComplete:self];
+        });
+    }
+}
+
+- (void)_completeWorkflowWithError:(NSError *)error
+{
+    WEAssert(error != nil);
+    
+    [self _commonCompletion];
+    
+    ENTER_CRITICAL_SECTION(self, _operationMutex)
+    
+    WEAssert(_state != WEWorkflowComplete);
+    _state = WEWorkflowComplete;
+    _error = error;
+    
+    LEAVE_CRITICAL_SECTION(self, _operationMutex)
+
+    id<WEWorkflowDelegate> delegate = _delegate;
+    if (delegate)
+    {
+        dispatch_async(_delegateQueue, ^{
+            [delegate workflow:self didFailWithError:error];
         });
     }
 }

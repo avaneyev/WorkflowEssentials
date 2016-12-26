@@ -18,10 +18,20 @@
 
 FOUNDATION_EXPORT NSString *const _Nonnull WEWorkflowErrorDomain;
 FOUNDATION_EXPORT NSInteger const WEWorkflowInvalidDependency;
+FOUNDATION_EXPORT NSInteger const WEWorkflowDependencyCycle;
+FOUNDATION_EXPORT NSInteger const WEWorkflowDeadlocked;
 
 @protocol WEWorkflowDelegate <NSObject>
 
+/**
+ Sent when workflow successfully completes.
+ */
 - (void)workflowDidComplete:(nonnull WEWorkflow *)workflow;
+
+/**
+ Sent when workflow fails with an error.
+ */
+- (void)workflow:(nonnull WEWorkflow *)workflow didFailWithError:(nonnull NSError *)error;
 
 @end
 
@@ -58,6 +68,16 @@ FOUNDATION_EXPORT NSInteger const WEWorkflowInvalidDependency;
  returns YES if the workflow has been completed, and NO otherwise
  */
 @property (nonatomic, readonly, getter=isCompleted) BOOL completed;
+
+/**
+ returns YES if the workflow had failed, and NO otherwise
+ */
+@property (nonatomic, readonly, getter=isFailed) BOOL failed;
+
+/**
+ returns an error if the workflow failed
+ */
+@property (nonatomic, readonly, nullable) NSError *error;
 
 /**
  Workflow context, and object that stores completed operation result and arbitrary workflow context
