@@ -19,5 +19,6 @@
 @interface WEDependencyDescription : WEConnectionDescription
 
 + (nonnull WEDependencyDescription *)dependencyFormOperation:(nonnull WEOperation *)from toOperation:(nonnull WEOperation *)to;
++ (nonnull WEDependencyDescription *)dependencyFormOperationName:(nonnull NSString *)from toOperationName:(nonnull NSString *)to;
 
 @end

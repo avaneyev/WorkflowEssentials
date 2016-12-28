@@ -30,6 +30,7 @@ NSString *const _Nonnull WEWorkflowErrorDomain = @"WEWorkflowErrorDomain";
 NSInteger const WEWorkflowInvalidDependency = -10001;
 NSInteger const WEWorkflowDependencyCycle = -10002;
 NSInteger const WEWorkflowDeadlocked = -10003;
+NSInteger const WEWorkflowDuplicateNames = -10004;
 
 @interface _WEOperationState : NSObject
 - (instancetype)init NS_UNAVAILABLE;
@@ -211,6 +212,11 @@ NSInteger const WEWorkflowDeadlocked = -10003;
         THROW_INCONSISTENCY(@{ NSLocalizedDescriptionKey: @"Cannot directly add an operation after the workflow had started." });
     }
     
+    if ([_operations containsObject:operation])
+    {
+        THROW_INVALID_PARAM(operation, @{ NSLocalizedDescriptionKey: @"Duplicate operation" });
+    }
+    
     [_operations addObject:operation];
     
     LEAVE_CRITICAL_SECTION(self, _operationMutex)
@@ -339,44 +345,58 @@ static _WEOperationState *_FindOperationState(
     NSMutableArray<_WEOperationState *> *operationStates = [[NSMutableArray alloc] initWithCapacity:operations.count];
     NSMutableDictionary<NSString *, _WEOperationState *> *namedOperations = [NSMutableDictionary new];
     NSString *name;
+    NSMutableOrderedSet *independentOperations;
+    
     for (WEOperation *operation in operations)
     {
         _WEOperationState *state = [[_WEOperationState alloc] initWithOperation:operation];
         [operationStates addObject:state];
         
         name = operation.name;
-        if (name != nil) [namedOperations setObject:state forKey:name];
+        if (name != nil)
+        {
+            if ([namedOperations objectForKey:name] != nil)
+            {
+                NSString *reason = [NSString stringWithFormat:@"Duplicate operation name \"%@\": operations [%@, %@]", name, operation, [namedOperations objectForKey:name]];
+                error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowDuplicateNames userInfo:@{ NSLocalizedDescriptionKey: reason }];
+                break;
+            }
+            [namedOperations setObject:state forKey:name];
+        }
     }
     
-    _allOperationStates = [operationStates copy];
-    NSMutableOrderedSet *independentOperations = [[NSMutableOrderedSet alloc] initWithArray:operationStates];
-    
-    for (WEDependencyDescription *dependency in dependencies)
+    if (error == nil)
     {
-        _WEOperationState *fromState = _FindOperationState(operationStates, namedOperations, dependency.sourceOperation, dependency.sourceOperationName);
-        _WEOperationState *toState = _FindOperationState(operationStates, namedOperations, dependency.targetOperation, dependency.targetOperationName);
+        _allOperationStates = [operationStates copy];
+        independentOperations = [[NSMutableOrderedSet alloc] initWithArray:operationStates];
         
-        if (fromState == nil || toState == nil)
+        for (WEDependencyDescription *dependency in dependencies)
         {
-            NSString *reason = [NSString stringWithFormat:@"Invalid dependency %@: from %@ to %@.", dependency, fromState ? @"valid" : @"invalid", toState ? @"valid" : @"invalid"];
-            error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowInvalidDependency userInfo:@{ NSLocalizedDescriptionKey: reason }];
-            break;
-        }
-        
-        // Check if dependency is not a duplicate, if it is - ignore
-        if (![fromState->_dependents containsObject:toState])
-        {
-            if ([toState->_dependents containsObject:fromState])
+            _WEOperationState *fromState = _FindOperationState(operationStates, namedOperations, dependency.sourceOperation, dependency.sourceOperationName);
+            _WEOperationState *toState = _FindOperationState(operationStates, namedOperations, dependency.targetOperation, dependency.targetOperationName);
+            
+            if (fromState == nil || toState == nil)
             {
-                // Deadlock, create an error and stop
-                NSString *reason = [NSString stringWithFormat:@"Dependency %@ will introduce a deadlock because reverse dependency is already defined.", dependency];
-                error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowDependencyCycle userInfo:@{ NSLocalizedDescriptionKey: reason }];
+                NSString *reason = [NSString stringWithFormat:@"Invalid dependency %@: from %@ to %@.", dependency, fromState ? @"valid" : @"invalid", toState ? @"valid" : @"invalid"];
+                error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowInvalidDependency userInfo:@{ NSLocalizedDescriptionKey: reason }];
                 break;
             }
             
-            [toState->_dependsOn addObject:fromState];
-            [fromState->_dependents addObject:toState];
-            [independentOperations removeObject:toState];
+            // Check if dependency is not a duplicate, if it is - ignore
+            if (![fromState->_dependents containsObject:toState])
+            {
+                if ([toState->_dependents containsObject:fromState])
+                {
+                    // Deadlock, create an error and stop
+                    NSString *reason = [NSString stringWithFormat:@"Dependency %@ will introduce a deadlock because reverse dependency is already defined.", dependency];
+                    error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowDependencyCycle userInfo:@{ NSLocalizedDescriptionKey: reason }];
+                    break;
+                }
+                
+                [toState->_dependsOn addObject:fromState];
+                [fromState->_dependents addObject:toState];
+                [independentOperations removeObject:toState];
+            }
         }
     }
     

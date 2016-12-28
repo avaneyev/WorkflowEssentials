@@ -20,4 +20,12 @@
     return dependency;
 }
 
++ (nonnull WEDependencyDescription *)dependencyFormOperationName:(nonnull NSString *)from toOperationName:(nonnull NSString *)to
+{
+    WEDependencyDescription *dependency = [[WEDependencyDescription alloc] init];
+    dependency.sourceOperationName = from;
+    dependency.targetOperationName = to;
+    return dependency;
+}
+
 @end

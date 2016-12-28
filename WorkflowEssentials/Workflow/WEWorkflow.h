@@ -20,6 +20,7 @@ FOUNDATION_EXPORT NSString *const _Nonnull WEWorkflowErrorDomain;
 FOUNDATION_EXPORT NSInteger const WEWorkflowInvalidDependency;
 FOUNDATION_EXPORT NSInteger const WEWorkflowDependencyCycle;
 FOUNDATION_EXPORT NSInteger const WEWorkflowDeadlocked;
+FOUNDATION_EXPORT NSInteger const WEWorkflowDuplicateNames;
 
 @protocol WEWorkflowDelegate <NSObject>
 
