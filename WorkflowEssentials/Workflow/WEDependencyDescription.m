@@ -12,4 +12,12 @@
 
 @implementation WEDependencyDescription
 
++ (WEDependencyDescription *)dependencyFormOperation:(WEOperation *)from toOperation:(WEOperation *)to
+{
+    WEDependencyDescription *dependency = [[WEDependencyDescription alloc] init];
+    dependency.sourceOperation = from;
+    dependency.targetOperation = to;
+    return dependency;
+}
+
 @end

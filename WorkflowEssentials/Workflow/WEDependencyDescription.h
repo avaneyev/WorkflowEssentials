@@ -18,4 +18,6 @@
  */
 @interface WEDependencyDescription : WEConnectionDescription
 
++ (nonnull WEDependencyDescription *)dependencyFormOperation:(nonnull WEOperation *)from toOperation:(nonnull WEOperation *)to;
+
 @end

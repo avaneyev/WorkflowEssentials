@@ -14,6 +14,7 @@
 #import <WorkflowEssentials/WEWorkflowContext.h>
 #import <WorkflowEssentials/WEOperation.h>
 #import <WorkflowEssentials/WEBlockOperation.h>
+#import <WorkflowEssentials/WEDependencyDescription.h>
 
 @interface WEWorkflowTests : XCTestCase
 @end
@@ -124,6 +125,46 @@
     }];
 }
 
+- (void)testWorkflowSerialExecutionSynchronousOperationCompletion
+{
+    // This test creates a serial workflow (at most one operation at a time)
+    // with its operations completing synchronously.
+    // It ensures that the workflow completes, finishes both operations
+    
+    WEOperationResult *firstResult = [[WEOperationResult alloc] initWithResult:@"result"];
+    WEOperationResult *secondResult = [[WEOperationResult alloc] initWithError:[NSError errorWithDomain:@"1" code:2 userInfo:nil]];
+    
+    OCMockObject<WEWorkflowDelegate> *delegateMock = [OCMockObject mockForProtocol:@protocol(WEWorkflowDelegate)];
+    
+    WEWorkflow *workflow = [[WEWorkflow alloc] initWithContextClass:nil maximumConcurrentOperations:1 delegate:delegateMock delegateQueue:dispatch_get_main_queue()];
+    WEBlockOperation *firstOperation = [[WEBlockOperation alloc] initWithName:nil requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        completion(firstResult);
+    }];
+    WEBlockOperation *secondOperation = [[WEBlockOperation alloc] initWithName:nil requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        completion(secondResult);
+    }];
+    
+    [workflow addOperation:firstOperation];
+    [workflow addOperation:secondOperation];
+    
+    XCTestExpectation *expectation = [self expectationWithDescription:@"wait until workflow completes"];
+    
+    [[[delegateMock expect] andDo:^(NSInvocation *invocation) {
+        [expectation fulfill];
+    }] workflowDidComplete:workflow];
+    
+    [workflow start];
+    
+    [self waitForExpectationsWithTimeout:1 handler:^(NSError * _Nullable error) {
+        XCTAssertTrue(firstOperation.finished);
+        XCTAssertEqual(firstOperation.result, firstResult);
+        XCTAssertTrue(secondOperation.finished);
+        XCTAssertEqual(secondOperation.result, secondResult);
+        XCTAssertTrue(workflow.completed);
+    }];
+}
+
+
 - (void)testWorkflowParallelExecutionOperations
 {
     // This test creates a parallel workflow and ensures that 2 operations can run at the same time.
@@ -175,6 +216,8 @@
         [expectation fulfill];
     }] workflowDidComplete:workflow];
     
+    [[delegateMock reject] workflow:[OCMArg any] didFailWithError:[OCMArg any]];
+    
     [workflow start];
     
     [self waitForExpectationsWithTimeout:1 handler:^(NSError * _Nullable error) {
@@ -184,6 +227,85 @@
         XCTAssertEqual(secondOperation.result, secondResult);
         XCTAssertTrue(workflow.completed);
     }];
+}
+
+- (void)_testWorkflowSimpleDependencySourceByName:(BOOL)sourceByName targetByName:(BOOL)targetByName
+{
+    // This test creates a workflow with 3 operations: O1, O2 and O3, such that O2 depends on O1
+    // and O3 is independent.
+    
+    WEOperationResult *r1 = [[WEOperationResult alloc] initWithResult:@"r1"];
+    WEOperationResult *r2 = [[WEOperationResult alloc] initWithResult:@"r2"];
+    WEOperationResult *r3 = [[WEOperationResult alloc] initWithResult:@"r3"];
+
+    OCMockObject<WEWorkflowDelegate> *delegateMock = [OCMockObject mockForProtocol:@protocol(WEWorkflowDelegate)];
+    
+    WEBlockOperation *o1 = [[WEBlockOperation alloc] initWithName:@"o1" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        completion(r1);
+    }];
+    WEBlockOperation *o2 = [[WEBlockOperation alloc] initWithName:@"o2" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTAssertTrue(o1.finished);
+        completion(r2);
+    }];
+    WEBlockOperation *o3 = [[WEBlockOperation alloc] initWithName:@"o3" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        completion(r3);
+    }];
+
+    WEWorkflow *workflow = [[WEWorkflow alloc] initWithContextClass:nil maximumConcurrentOperations:3 delegate:delegateMock delegateQueue:dispatch_get_main_queue()];
+    
+    [workflow addOperation:o1];
+    [workflow addOperation:o2];
+    [workflow addOperation:o3];
+    
+    WEDependencyDescription *dependency = [[WEDependencyDescription alloc] init];
+
+    if (sourceByName) dependency.sourceOperationName = o1.name;
+    else dependency.sourceOperation = o1;
+
+    if (targetByName) dependency.targetOperationName = o2.name;
+    else dependency.targetOperation = o2;
+    
+    [workflow addDependency:dependency];
+
+    XCTestExpectation *expectation = [self expectationWithDescription:@"wait until workflow completes"];
+    
+    [[[delegateMock expect] andDo:^(NSInvocation *invocation) {
+        [expectation fulfill];
+    }] workflowDidComplete:workflow];
+    
+    [[delegateMock reject] workflow:[OCMArg any] didFailWithError:[OCMArg any]];
+    
+    [workflow start];
+    
+    [self waitForExpectationsWithTimeout:1 handler:^(NSError * _Nullable error) {
+        XCTAssertTrue(o1.finished);
+        XCTAssertEqual(o1.result, r1);
+        XCTAssertTrue(o2.finished);
+        XCTAssertEqual(o2.result, r2);
+        XCTAssertTrue(o3.finished);
+        XCTAssertEqual(o3.result, r3);
+        XCTAssertTrue(workflow.completed);
+    }];
+}
+
+- (void)testWorkflowSimpleDependencySourceAndTargetByReference
+{
+    [self _testWorkflowSimpleDependencySourceByName:NO targetByName:NO];
+}
+
+- (void)testWorkflowSimpleDependencySourceAndTargetByName
+{
+    [self _testWorkflowSimpleDependencySourceByName:YES targetByName:YES];
+}
+
+- (void)testWorkflowSimpleDependencySourceByNameTargetByReference
+{
+    [self _testWorkflowSimpleDependencySourceByName:YES targetByName:NO];
+}
+
+- (void)testWorkflowSimpleDependencySourceByReferenceTargetByName
+{
+    [self _testWorkflowSimpleDependencySourceByName:NO targetByName:YES];
 }
 
 @end
