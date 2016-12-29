@@ -17,7 +17,7 @@
  Both source and target operations must be defined.
  Both can be defined by either specifying an operation object or providing an operation name,
  which will then be resolved to an operation.
- Name resolution will be performed when the workflow starts.If a name was specified,
+ Name resolution will be performed when the workflow starts. If a name was specified,
  and resolving it to an operation fails (workflow does not have an operation with such name), 
  workflow completes with an error. 
  Referencing operations by name rather than operation objects may be useful for loosely coupled
