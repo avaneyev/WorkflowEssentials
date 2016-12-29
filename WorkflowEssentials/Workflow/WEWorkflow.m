@@ -308,7 +308,7 @@ NSInteger const WEWorkflowDuplicateNames = -10004;
         }
         else
         {
-            // TODO: complete workflow with error
+            [self _completeWorkflowWithError:error];
         }
     }
 }

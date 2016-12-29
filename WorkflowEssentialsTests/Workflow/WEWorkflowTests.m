@@ -21,6 +21,8 @@
 
 @implementation WEWorkflowTests
 
+#pragma mark - Workflow before starting
+
 - (void)testWorkflowInitialState
 {
     WEWorkflow *workflow = [[WEWorkflow alloc] initWithContextClass:nil maximumConcurrentOperations:1];
@@ -51,6 +53,20 @@
     XCTAssertFalse(workflow.isActive);
     XCTAssertFalse(workflow.isCompleted);
 }
+
+- (void)testWorkflowAddDependencyTwiceError
+{
+    WEWorkflow *workflow = [[WEWorkflow alloc] initWithContextClass:nil maximumConcurrentOperations:1];
+    WEBlockOperation *operation = [[WEBlockOperation alloc] initWithName:nil requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTFail(@"Should not start an operation until workflow had started");
+    }];
+    
+    XCTAssertNoThrow([workflow addOperation:operation]);
+    XCTAssertThrows([workflow addOperation:operation]);
+}
+
+
+#pragma mark - Workflow execution without dependencies
 
 - (void)testWorkflowSerialExecutionCompletesOperations
 {
@@ -229,6 +245,9 @@
     }];
 }
 
+
+#pragma mark - Workflow with dependencies
+
 - (void)_testWorkflowSimpleDependencySourceByName:(BOOL)sourceByName targetByName:(BOOL)targetByName
 {
     // This test creates a workflow with 3 operations: O1, O2 and O3, such that O2 depends on O1
@@ -387,6 +406,62 @@
     // the one that depends on others is performed last.
     
     [self _testWorkflowMultipleDependenciesWithMaximumConcurrent:5];
+}
+
+
+#pragma mark - Dependency Error Handling
+
+- (void)testWorkflowExplicitDependencyToUnownedOperationThrows
+{
+    WEWorkflow *workflow = [[WEWorkflow alloc] initWithContextClass:nil maximumConcurrentOperations:1];
+    WEBlockOperation *operation = [[WEBlockOperation alloc] initWithName:nil requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTFail(@"Should not start an operation until workflow had started");
+    }];
+    WEBlockOperation *unownedOperation = [[WEBlockOperation alloc] initWithName:nil requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTFail(@"Should not start an operation until workflow had started");
+    }];
+
+    [workflow addOperation:operation];
+    
+    WEDependencyDescription *invalidDependency = [WEDependencyDescription dependencyFormOperation:operation toOperation:unownedOperation];
+    
+    XCTAssertThrows([workflow addDependency:invalidDependency]);
+}
+
+- (void)testWorkflowNamedOperationDependencyFailsToResolveOperation
+{
+    WEBlockOperation *firstOperation = [[WEBlockOperation alloc] initWithName:@"first" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTFail(@"Should not start an operation until workflow had started");
+    }];
+    WEBlockOperation *secondOperation = [[WEBlockOperation alloc] initWithName:@"second" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTFail(@"Should not start an operation until workflow had started");
+    }];
+ 
+    XCTestExpectation *expectation = [self expectationWithDescription:@"wait until workflow completes"];
+
+    OCMockObject<WEWorkflowDelegate> *delegateMock = [OCMockObject mockForProtocol:@protocol(WEWorkflowDelegate)];
+
+    WEWorkflow *workflow = [[WEWorkflow alloc] initWithContextClass:nil maximumConcurrentOperations:5 delegate:delegateMock delegateQueue:dispatch_get_main_queue()];
+
+    [[delegateMock reject] workflowDidComplete:workflow];
+    [[[delegateMock expect] andDo:^(NSInvocation *invocation) {
+        [expectation fulfill];
+    }] workflow:workflow didFailWithError:[OCMArg checkWithBlock:^BOOL(NSError *e) {
+        return [e.domain isEqualToString:WEWorkflowErrorDomain] && e.code == WEWorkflowInvalidDependency;
+    }]];
+    
+    [workflow addOperation:firstOperation];
+    [workflow addOperation:secondOperation];
+    
+    WEDependencyDescription *invalidDependency = [WEDependencyDescription dependencyFormOperationName:@"first" toOperationName:@"unknown"];
+    XCTAssertNoThrow([workflow addDependency:invalidDependency]);
+    
+    [workflow start];
+
+    [self waitForExpectationsWithTimeout:1 handler:^(NSError * _Nullable error) {
+        XCTAssertTrue(workflow.completed);
+        XCTAssertNotNil(workflow.error);
+    }];
 }
 
 @end
