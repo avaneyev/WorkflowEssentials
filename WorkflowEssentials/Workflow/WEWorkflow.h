@@ -12,12 +12,27 @@
 
 @class WEWorkflowContext;
 @class WEOperation;
+@class WEDependencyDescription;
 
 @class WEWorkflow;
 
+FOUNDATION_EXPORT NSString *const _Nonnull WEWorkflowErrorDomain;
+FOUNDATION_EXPORT NSInteger const WEWorkflowInvalidDependency;
+FOUNDATION_EXPORT NSInteger const WEWorkflowDependencyCycle;
+FOUNDATION_EXPORT NSInteger const WEWorkflowDeadlocked;
+FOUNDATION_EXPORT NSInteger const WEWorkflowDuplicateNames;
+
 @protocol WEWorkflowDelegate <NSObject>
 
+/**
+ Sent when workflow successfully completes.
+ */
 - (void)workflowDidComplete:(nonnull WEWorkflow *)workflow;
+
+/**
+ Sent when workflow fails with an error.
+ */
+- (void)workflow:(nonnull WEWorkflow *)workflow didFailWithError:(nonnull NSError *)error;
 
 @end
 
@@ -56,6 +71,16 @@
 @property (nonatomic, readonly, getter=isCompleted) BOOL completed;
 
 /**
+ returns YES if the workflow had failed, and NO otherwise
+ */
+@property (nonatomic, readonly, getter=isFailed) BOOL failed;
+
+/**
+ returns an error if the workflow failed
+ */
+@property (nonatomic, readonly, nullable) NSError *error;
+
+/**
  Workflow context, and object that stores completed operation result and arbitrary workflow context
  */
 @property (nonatomic, readonly, strong, nonnull) WEWorkflowContext *context;
@@ -72,8 +97,17 @@
 
 /**
  Adds a single operation
+ @param operation an operation to add
  */
 - (void)addOperation:(nonnull WEOperation *)operation;
+
+/**
+ Add a dependency. Specifies that one operation depends on another.
+ @param dependency describes the dependency to be added.
+ @discussion dependency description will go through a set of quick sanity checks before being added.
+ Dependency will be copied by the workflow.
+ */
+- (void)addDependency:(nonnull WEDependencyDescription *)dependency;
 
 /**
  Starts executing the workflow

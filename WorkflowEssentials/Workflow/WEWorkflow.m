@@ -9,8 +9,11 @@
 //
 
 #import <WorkflowEssentials/WEWorkflow.h>
-#import <WorkflowEssentials/WEWorkflowContext.h>
+
+#import <WorkflowEssentials/WEDependencyDescription.h>
 #import <WorkflowEssentials/WEOperation.h>
+#import <WorkflowEssentials/WESegueDescription.h>
+#import <WorkflowEssentials/WEWorkflowContext.h>
 
 #import <pthread.h>
 #import "WETools.h"
@@ -23,6 +26,50 @@ typedef enum
     WEWorkflowComplete
 } WEWorkflowState;
 
+NSString *const _Nonnull WEWorkflowErrorDomain = @"WEWorkflowErrorDomain";
+NSInteger const WEWorkflowInvalidDependency = -10001;
+NSInteger const WEWorkflowDependencyCycle = -10002;
+NSInteger const WEWorkflowDeadlocked = -10003;
+NSInteger const WEWorkflowDuplicateNames = -10004;
+
+@interface _WEOperationState : NSObject
+- (instancetype)init NS_UNAVAILABLE;
+- (instancetype)initWithOperation:(nonnull WEOperation *)operation NS_DESIGNATED_INITIALIZER;
+
+@property (nonatomic, readonly, assign, nonnull) WEOperation *operation;
+@property (nonatomic, readonly, strong, nonnull) NSHashTable<_WEOperationState *> *dependsOn;
+@property (nonatomic, readonly, strong, nonnull) NSHashTable<_WEOperationState *> *dependents;
+@end
+
+@implementation _WEOperationState
+{
+@package
+    __unsafe_unretained WEOperation *_operation;
+    NSHashTable *_dependsOn;
+    NSHashTable *_dependents;
+    NSUInteger _completedDependsOnOperations;
+}
+
+@synthesize operation = _operation,
+    dependsOn = _dependsOn,
+    dependents = _dependents;
+
+- (instancetype)initWithOperation:(WEOperation *)operation
+{
+    WEAssert(operation != nil);
+    
+    if (self = [super init])
+    {
+        _operation = operation;
+        NSPointerFunctionsOptions options = NSPointerFunctionsWeakMemory | NSPointerFunctionsObjectPointerPersonality;
+        _dependsOn = [[NSHashTable alloc] initWithOptions:options capacity:2];
+        _dependents = [[NSHashTable alloc] initWithOptions:options capacity:2];
+    }
+    return self;
+}
+
+@end
+
 @implementation WEWorkflow
 {
     WEWorkflowContext *_context;
@@ -34,16 +81,19 @@ typedef enum
     pthread_mutex_t _operationMutex;
     dispatch_queue_t _workflowInternalQueue;
     WEWorkflowState _state;
+    NSError *_error;
     NSMutableArray<WEOperation *> *_operations;
-    NSMutableOrderedSet<WEOperation *> *_operationsReadyToExecute;
-    NSMutableSet<WEOperation *> *_activeOperations;
+    NSMutableArray<WEDependencyDescription *> *_dependencies;
+    NSArray<_WEOperationState *> *_allOperationStates;
+    NSUInteger _totalCompletedOperations;
+    NSMutableOrderedSet<_WEOperationState *> *_operationsReadyToExecute;
+    NSMutableSet<_WEOperationState *> *_activeOperations;
 }
 
 - (instancetype)init
 {
     return [self initWithContextClass:nil maximumConcurrentOperations:0];
 }
-
 
 - (instancetype)initWithContextClass:(Class)contextClass
          maximumConcurrentOperations:(NSUInteger)maximumConcurrentOperations
@@ -79,6 +129,7 @@ typedef enum
         
         pthread_mutex_init(&_operationMutex, NULL);
         _operations = [NSMutableArray new];
+        _dependencies = [NSMutableArray new];
     }
     return self;
 }
@@ -109,6 +160,24 @@ typedef enum
     isCompleted = _state == WEWorkflowComplete;
     LEAVE_CRITICAL_SECTION(self, _operationMutex)
     return isCompleted;
+}
+
+- (BOOL)isFailed
+{
+    BOOL isFailed = NO;
+    ENTER_CRITICAL_SECTION(self, _operationMutex)
+    isFailed = _state == WEWorkflowComplete && _error != nil;
+    LEAVE_CRITICAL_SECTION(self, _operationMutex)
+    return isFailed;
+}
+
+- (NSError *)error
+{
+    NSError *error;
+    ENTER_CRITICAL_SECTION(self, _operationMutex)
+    error = _error;
+    LEAVE_CRITICAL_SECTION(self, _operationMutex)
+    return error;
 }
 
 - (NSArray<WEOperation *> *)operations
@@ -143,8 +212,43 @@ typedef enum
         THROW_INCONSISTENCY(@{ NSLocalizedDescriptionKey: @"Cannot directly add an operation after the workflow had started." });
     }
     
+    if ([_operations containsObject:operation])
+    {
+        THROW_INVALID_PARAM(operation, @{ NSLocalizedDescriptionKey: @"Duplicate operation" });
+    }
+    
     [_operations addObject:operation];
     
+    LEAVE_CRITICAL_SECTION(self, _operationMutex)
+}
+
+- (void)addDependency:(WEDependencyDescription *)dependency
+{
+    if (dependency == nil) THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Dependency not specified" });
+    if (dependency.sourceOperation == nil && dependency.sourceOperationName == nil) THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Source operation not specified" });
+    if (dependency.targetOperation == nil && dependency.targetOperationName == nil) THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Target operation not specified" });
+    
+    ENTER_CRITICAL_SECTION(self, _operationMutex)
+
+    if (_state != WEWorkflowInactive)
+    {
+        THROW_INCONSISTENCY(@{ NSLocalizedDescriptionKey: @"Cannot directly add a dependency after the workflow had started." });
+    }
+    
+    // Verify that explicitly specified operations belong to the workflow
+    WEOperation *sourceOperation = dependency.sourceOperation;
+    if (sourceOperation != nil && ![_operations containsObject:sourceOperation])
+    {
+        THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Source operation does not belong to the workflow" });
+    }
+    WEOperation *targetOperation = dependency.targetOperation;
+    if (targetOperation != nil && ![_operations containsObject:targetOperation])
+    {
+        THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Target operation does not belong to the workflow" });
+    }
+    
+    [_dependencies addObject:[dependency copy]];
+
     LEAVE_CRITICAL_SECTION(self, _operationMutex)
 }
 
@@ -180,11 +284,13 @@ typedef enum
     // Will change later.
     
     NSArray<WEOperation *> *operations;
+    NSArray<WEDependencyDescription *> *dependencies;
     ENTER_CRITICAL_SECTION(self, _operationMutex)
     
     WEAssert(_state == WEWorkflowActive);
     
     operations = [_operations copy];
+    dependencies = [_dependencies copy];
     LEAVE_CRITICAL_SECTION(self, _operationMutex)
     
     if (operations.count == 0)
@@ -193,10 +299,123 @@ typedef enum
     }
     else
     {
-        _operationsReadyToExecute = [[NSMutableOrderedSet alloc] initWithArray:operations];
-        _activeOperations = [[NSMutableSet alloc] initWithCapacity:_maximumConcurrentOperations];
-        [self _checkAndStartReadyOperation];
+        NSError *error = [self _buildDependencyGraphWithOperations:operations dependencies:dependencies];
+        if (error == nil)
+        {
+            _totalCompletedOperations = 0;
+            _activeOperations = [[NSMutableSet alloc] initWithCapacity:_maximumConcurrentOperations];
+            [self _checkAndStartReadyOperation];
+        }
+        else
+        {
+            [self _completeWorkflowWithError:error];
+        }
     }
+}
+
+static _WEOperationState *_FindOperationState(
+                                              NSMutableArray<_WEOperationState *> *operationStates,
+                                              NSMutableDictionary<NSString *, _WEOperationState *> *namedOperations,
+                                              WEOperation *operation,
+                                              NSString *operationName
+                                              )
+{
+    _WEOperationState *state;
+    if (operation == nil)
+    {
+        state = [namedOperations objectForKey:operationName];
+    }
+    else
+    {
+        for (_WEOperationState *otherState in operationStates)
+        {
+            if (otherState->_operation == operation)
+            {
+                state = otherState;
+                break;
+            }
+        }
+    }
+    return state;
+}
+
+- (NSError *)_buildDependencyGraphWithOperations:(NSArray<WEOperation *> *)operations dependencies:(NSArray<WEDependencyDescription *> *)dependencies
+{
+    NSError *error = nil;
+    NSMutableArray<_WEOperationState *> *operationStates = [[NSMutableArray alloc] initWithCapacity:operations.count];
+    NSMutableDictionary<NSString *, _WEOperationState *> *namedOperations = [NSMutableDictionary new];
+    NSString *name;
+    NSMutableOrderedSet *independentOperations;
+    
+    for (WEOperation *operation in operations)
+    {
+        _WEOperationState *state = [[_WEOperationState alloc] initWithOperation:operation];
+        [operationStates addObject:state];
+        
+        name = operation.name;
+        if (name != nil)
+        {
+            if ([namedOperations objectForKey:name] != nil)
+            {
+                NSString *reason = [NSString stringWithFormat:@"Duplicate operation name \"%@\": operations [%@, %@]", name, operation, [namedOperations objectForKey:name]];
+                error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowDuplicateNames userInfo:@{ NSLocalizedDescriptionKey: reason }];
+                break;
+            }
+            [namedOperations setObject:state forKey:name];
+        }
+    }
+    
+    if (error == nil)
+    {
+        _allOperationStates = [operationStates copy];
+        independentOperations = [[NSMutableOrderedSet alloc] initWithArray:operationStates];
+        
+        for (WEDependencyDescription *dependency in dependencies)
+        {
+            _WEOperationState *fromState = _FindOperationState(operationStates, namedOperations, dependency.sourceOperation, dependency.sourceOperationName);
+            _WEOperationState *toState = _FindOperationState(operationStates, namedOperations, dependency.targetOperation, dependency.targetOperationName);
+            
+            if (fromState == nil || toState == nil)
+            {
+                NSString *reason = [NSString stringWithFormat:@"Invalid dependency %@: from %@ to %@.", dependency, fromState ? @"valid" : @"invalid", toState ? @"valid" : @"invalid"];
+                error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowInvalidDependency userInfo:@{ NSLocalizedDescriptionKey: reason }];
+                break;
+            }
+            
+            // Check if dependency is not a duplicate, if it is - ignore
+            if (![fromState->_dependents containsObject:toState])
+            {
+                if ([toState->_dependents containsObject:fromState])
+                {
+                    // Deadlock, create an error and stop
+                    NSString *reason = [NSString stringWithFormat:@"Dependency %@ will introduce a deadlock because reverse dependency is already defined.", dependency];
+                    error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowDependencyCycle userInfo:@{ NSLocalizedDescriptionKey: reason }];
+                    break;
+                }
+                
+                [toState->_dependsOn addObject:fromState];
+                [fromState->_dependents addObject:toState];
+                [independentOperations removeObject:toState];
+            }
+        }
+    }
+    
+    if (error == nil)
+    {
+        if (independentOperations.count == 0)
+        {
+            // No independent operations means that each operation depends on at least another one, and nothing can start.
+            NSString *reason = @"Every operation in the workflow depends on at least one other operation. No operations are ready to start.";
+            error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowDependencyCycle userInfo:@{ NSLocalizedDescriptionKey: reason }];
+        }
+        else
+        {
+            // TODO: Perform a more complex check for cycles
+            _operationsReadyToExecute = independentOperations;
+        }
+    }
+    
+    return error;
 }
 
 static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperation *operation)
@@ -222,18 +441,20 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
     // Only proceed if had not reached maximum number of operations allowed.
     if (_maximumConcurrentOperations > 0 && _activeOperations.count >= _maximumConcurrentOperations) return;
     
-    WEOperation *firstReadyOperation = _operationsReadyToExecute.firstObject;
+    _WEOperationState *firstReadyOperation = _operationsReadyToExecute.firstObject;
     [_operationsReadyToExecute removeObject:firstReadyOperation];
     WEAssert(firstReadyOperation != nil);
-    WEAssert(!firstReadyOperation.active && !firstReadyOperation.finished && !firstReadyOperation.cancelled);
+    
+    WEOperation *operation = firstReadyOperation->_operation;
+    WEAssert(!operation.active && !operation.finished && !operation.cancelled);
     
     [_activeOperations addObject:firstReadyOperation];
     
-    dispatch_queue_t operationQueue = _WEQueueForOperation(firstReadyOperation);
+    dispatch_queue_t operationQueue = _WEQueueForOperation(operation);
     
     dispatch_async(operationQueue, ^{
         // TODO: pass explicit builder as the only facility an operation can amend the workflow.
-        [firstReadyOperation prepareForExecutionWithContext:self->_context];
+        [operation prepareForExecutionWithContext:self->_context];
         dispatch_async(self->_workflowInternalQueue, ^{
             [self _runOperationIfStillPossible:firstReadyOperation onQueue:operationQueue];
         });
@@ -246,41 +467,63 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
     }
 }
 
-- (void)_runOperationIfStillPossible:(WEOperation *)operation onQueue:(dispatch_queue_t)queue
+- (void)_runOperationIfStillPossible:(_WEOperationState *)operationState onQueue:(dispatch_queue_t)queue
 {
-    WEAssert(operation != nil);
-    WEAssert([_activeOperations containsObject:operation]);
+    WEAssert(operationState != nil);
+    WEAssert([_activeOperations containsObject:operationState]);
     
     // TODO: if an operation cannot run after preparation, remove it from the list of active
     
-    [_activeOperations addObject:operation];
     dispatch_async(queue, ^{
-        [operation startWithCompletion:^(WEOperationResult * _Nullable result) {
-            [self _completeOperation:operation withResult:result];
+        [operationState->_operation startWithCompletion:^(WEOperationResult * _Nullable result) {
+            [self _completeOperation:operationState withResult:result];
         } completionQueue:self->_workflowInternalQueue];
     });
 }
 
-- (void)_completeOperation:(WEOperation *)operation withResult:(WEOperationResult *)result
+- (void)_completeOperation:(_WEOperationState *)operationState withResult:(WEOperationResult *)result
 {
-    WEAssert(operation != nil);
-    WEAssert([_activeOperations containsObject:operation]);
+    WEAssert(operationState != nil);
+    _totalCompletedOperations++;
+    
+    // TODO: if the workflow had failed already, don't proceed.
+    
+    WEAssert([_activeOperations containsObject:operationState]);
 
-    [_activeOperations removeObject:operation];
-    NSString *operationName = operation.name;
+    [_activeOperations removeObject:operationState];
+    NSString *operationName = operationState->_operation.name;
     if (operationName != nil)
     {
         [_context _setOperationResult:result forOperationName:operationName];
     }
+
+    // check if any operations depending on the one just completed can now run
+    for (_WEOperationState *dependent in operationState->_dependents)
+    {
+        NSUInteger completed = ++(dependent->_completedDependsOnOperations);
+        NSUInteger totalDependsOn = dependent->_dependsOn.count;
+        WEAssert(completed <= totalDependsOn);
+        if (completed == totalDependsOn)
+        {
+            [_operationsReadyToExecute addObject:dependent];
+        }
+    }
     
     // check if workflow is complete.
-    // for now, since all operations are immediately ready, only check if something is active or waiting
-    
-    // TODO: check if any operations depending on the one just completed can now run
     
     if (_activeOperations.count == 0 && _operationsReadyToExecute.count == 0)
     {
-        [self _completeWorkflow];
+        if (_totalCompletedOperations < _allOperationStates.count)
+        {
+            // TODO: with segues, this may not be an error anymore, revisit.
+            NSString *reason = [NSString stringWithFormat:@"Workflow %@ cannot proceed: completed %li of %li operations, but no operations are ready for execution or active.", self, (long)_totalCompletedOperations, (long)_allOperationStates.count];
+            NSError *error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowDeadlocked userInfo:@{ NSLocalizedDescriptionKey: reason }];
+            [self _completeWorkflowWithError:error];
+        }
+        else
+        {
+            [self _completeWorkflow];
+        }
     }
     else if (_operationsReadyToExecute.count > 0)
     {
@@ -288,10 +531,20 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
     }
 }
 
+- (void)_commonCompletion
+{
+    _allOperationStates = nil;
+    _totalCompletedOperations = 0;
+    _operationsReadyToExecute = nil;
+    _activeOperations = nil;
+}
+
 - (void)_completeWorkflow
 {
     WEAssert(_activeOperations.count == 0);
     WEAssert(_operationsReadyToExecute.count == 0);
+    
+    [self _commonCompletion];
     
     ENTER_CRITICAL_SECTION(self, _operationMutex)
     
@@ -305,6 +558,29 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
     {
         dispatch_async(_delegateQueue, ^{
             [delegate workflowDidComplete:self];
+        });
+    }
+}
+
+- (void)_completeWorkflowWithError:(NSError *)error
+{
+    WEAssert(error != nil);
+    
+    [self _commonCompletion];
+    
+    ENTER_CRITICAL_SECTION(self, _operationMutex)
+    
+    WEAssert(_state != WEWorkflowComplete);
+    _state = WEWorkflowComplete;
+    _error = error;
+    
+    LEAVE_CRITICAL_SECTION(self, _operationMutex)
+
+    id<WEWorkflowDelegate> delegate = _delegate;
+    if (delegate)
+    {
+        dispatch_async(_delegateQueue, ^{
+            [delegate workflow:self didFailWithError:error];
         });
     }
 }

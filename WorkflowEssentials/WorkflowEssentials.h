@@ -21,3 +21,6 @@ FOUNDATION_EXPORT const unsigned char WorkflowEssentialsVersionString[];
 #import <WorkflowEssentials/WEOperationResult.h>
 #import <WorkflowEssentials/WEWorkflow.h>
 #import <WorkflowEssentials/WEWorkflowContext.h>
+#import <WorkflowEssentials/WEConnectionDescription.h>
+#import <WorkflowEssentials/WEDependencyDescription.h>
+#import <WorkflowEssentials/WESegueDescription.h>
