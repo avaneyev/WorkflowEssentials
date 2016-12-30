@@ -84,6 +84,7 @@ NSInteger const WEWorkflowDuplicateNames = -10004;
     NSError *_error;
     NSMutableArray<WEOperation *> *_operations;
     NSMutableArray<WEDependencyDescription *> *_dependencies;
+    NSMutableArray<WESegueDescription *> *_segues;
     NSArray<_WEOperationState *> *_allOperationStates;
     NSUInteger _totalCompletedOperations;
     NSMutableOrderedSet<_WEOperationState *> *_operationsReadyToExecute;
@@ -130,6 +131,7 @@ NSInteger const WEWorkflowDuplicateNames = -10004;
         pthread_mutex_init(&_operationMutex, NULL);
         _operations = [NSMutableArray new];
         _dependencies = [NSMutableArray new];
+        _segues = [NSMutableArray new];
     }
     return self;
 }
@@ -222,6 +224,26 @@ NSInteger const WEWorkflowDuplicateNames = -10004;
     LEAVE_CRITICAL_SECTION(self, _operationMutex)
 }
 
+- (void)_verifyConnectionBeforeAdding:(WEConnectionDescription *)connection
+{
+    if (_state != WEWorkflowInactive)
+    {
+        THROW_INCONSISTENCY(@{ NSLocalizedDescriptionKey: @"Cannot directly add a dependency after the workflow had started." });
+    }
+    
+    // Verify that explicitly specified operations belong to the workflow
+    WEOperation *sourceOperation = connection.sourceOperation;
+    if (sourceOperation != nil && ![_operations containsObject:sourceOperation])
+    {
+        THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Source operation does not belong to the workflow" });
+    }
+    WEOperation *targetOperation = connection.targetOperation;
+    if (targetOperation != nil && ![_operations containsObject:targetOperation])
+    {
+        THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Target operation does not belong to the workflow" });
+    }
+}
+
 - (void)addDependency:(WEDependencyDescription *)dependency
 {
     if (dependency == nil) THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Dependency not specified" });
@@ -230,25 +252,23 @@ NSInteger const WEWorkflowDuplicateNames = -10004;
     
     ENTER_CRITICAL_SECTION(self, _operationMutex)
 
-    if (_state != WEWorkflowInactive)
-    {
-        THROW_INCONSISTENCY(@{ NSLocalizedDescriptionKey: @"Cannot directly add a dependency after the workflow had started." });
-    }
-    
-    // Verify that explicitly specified operations belong to the workflow
-    WEOperation *sourceOperation = dependency.sourceOperation;
-    if (sourceOperation != nil && ![_operations containsObject:sourceOperation])
-    {
-        THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Source operation does not belong to the workflow" });
-    }
-    WEOperation *targetOperation = dependency.targetOperation;
-    if (targetOperation != nil && ![_operations containsObject:targetOperation])
-    {
-        THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Target operation does not belong to the workflow" });
-    }
-    
+    [self _verifyConnectionBeforeAdding:dependency];
     [_dependencies addObject:[dependency copy]];
 
+    LEAVE_CRITICAL_SECTION(self, _operationMutex)
+}
+
+- (void)addSegue:(nonnull WESegueDescription *)segue
+{
+    if (segue == nil) THROW_INVALID_PARAM(segue, @{ NSLocalizedDescriptionKey: @"Segue not specified" });
+    if (segue.sourceOperation == nil && segue.sourceOperationName == nil) THROW_INVALID_PARAM(segue, @{ NSLocalizedDescriptionKey: @"Source operation not specified" });
+    if (segue.targetOperation == nil && segue.targetOperationName == nil) THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Target operation not specified" });
+
+    ENTER_CRITICAL_SECTION(self, _operationMutex)
+    
+    [self _verifyConnectionBeforeAdding:segue];
+    [_segues addObject:[segue copy]];
+    
     LEAVE_CRITICAL_SECTION(self, _operationMutex)
 }
 

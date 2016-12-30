@@ -13,6 +13,7 @@
 @class WEWorkflowContext;
 @class WEOperation;
 @class WEDependencyDescription;
+@class WESegueDescription;
 
 @class WEWorkflow;
 
@@ -108,6 +109,16 @@ FOUNDATION_EXPORT NSInteger const WEWorkflowDuplicateNames;
  Dependency will be copied by the workflow.
  */
 - (void)addDependency:(nonnull WEDependencyDescription *)dependency;
+
+/**
+ Add a segue. Specifies that one operation is conditionally set to start when another one completes.
+ Segue may specify a condition (evaluated on its source operation result), if it does, the condition
+ must evaluate to YES for the target operation to be set as ready to start.
+ @param segue describes the segue to be added.
+ @discussion segue description will go through a set of quick sanity checks before being added.
+ Segue will be copied by the workflow.
+ */
+- (void)addSegue:(nonnull WESegueDescription *)segue;
 
 /**
  Starts executing the workflow
