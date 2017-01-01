@@ -31,28 +31,37 @@ NSInteger const WEWorkflowInvalidDependency = -10001;
 NSInteger const WEWorkflowDependencyCycle = -10002;
 NSInteger const WEWorkflowDeadlocked = -10003;
 NSInteger const WEWorkflowDuplicateNames = -10004;
+NSInteger const WEWorkflowInvalidSegue = -10005;
 
 @interface _WEOperationState : NSObject
 - (instancetype)init NS_UNAVAILABLE;
 - (instancetype)initWithOperation:(nonnull WEOperation *)operation NS_DESIGNATED_INITIALIZER;
 
 @property (nonatomic, readonly, assign, nonnull) WEOperation *operation;
-@property (nonatomic, readonly, strong, nonnull) NSHashTable<_WEOperationState *> *dependsOn;
-@property (nonatomic, readonly, strong, nonnull) NSHashTable<_WEOperationState *> *dependents;
+
 @end
 
 @implementation _WEOperationState
 {
 @package
     __unsafe_unretained WEOperation *_operation;
+    
+    // Dependencies are unordered, all dependencies need to be fulfilled before their target can execute.
     NSHashTable *_dependsOn;
     NSHashTable *_dependents;
     NSUInteger _completedDependsOnOperations;
+    
+    // Segues are ordered.
+    // Outgoing segues fire in the order they were added, except for segues targeting operations that have
+    // unfulfilled dependencies.
+    // Incoming segues fire immediately if the operation does not have unfulfilled dependencies, otherwise
+    // they fire in the order they were activated (in the order their sources completed).
+    NSMutableArray *_outgoingSegues;
+    BOOL _hasIncomingSegues;
+    NSMutableArray *_activatedIncomingSegues;
 }
 
-@synthesize operation = _operation,
-    dependsOn = _dependsOn,
-    dependents = _dependents;
+@synthesize operation = _operation;
 
 - (instancetype)initWithOperation:(WEOperation *)operation
 {
@@ -61,9 +70,6 @@ NSInteger const WEWorkflowDuplicateNames = -10004;
     if (self = [super init])
     {
         _operation = operation;
-        NSPointerFunctionsOptions options = NSPointerFunctionsWeakMemory | NSPointerFunctionsObjectPointerPersonality;
-        _dependsOn = [[NSHashTable alloc] initWithOptions:options capacity:2];
-        _dependents = [[NSHashTable alloc] initWithOptions:options capacity:2];
     }
     return self;
 }
@@ -92,6 +98,7 @@ NSInteger const WEWorkflowDuplicateNames = -10004;
     NSUInteger _totalCompletedOperations;
     NSMutableOrderedSet<_WEOperationState *> *_operationsReadyToExecute;
     NSMutableSet<_WEOperationState *> *_activeOperations;
+    BOOL _hasSeguesInternal;
 }
 
 - (instancetype)init
@@ -308,12 +315,14 @@ NSInteger const WEWorkflowDuplicateNames = -10004;
     
     NSArray<WEOperation *> *operations;
     NSArray<WEDependencyDescription *> *dependencies;
+    NSArray<WESegueDescription *> *segues;
     ENTER_CRITICAL_SECTION(self, _operationMutex)
     
     WEAssert(_state == WEWorkflowActive);
     
     operations = [_operations copy];
     dependencies = [_dependencies copy];
+    segues = [_segues copy];
     LEAVE_CRITICAL_SECTION(self, _operationMutex)
     
     if (operations.count == 0)
@@ -323,7 +332,7 @@ NSInteger const WEWorkflowDuplicateNames = -10004;
     else
     {
         _isFailedInternal = NO;
-        NSError *error = [self _buildDependencyGraphWithOperations:operations dependencies:dependencies];
+        NSError *error = [self _buildDependencyGraphWithOperations:operations dependencies:dependencies segues:segues];
         if (error == nil)
         {
             _totalCompletedOperations = 0;
@@ -363,14 +372,21 @@ static _WEOperationState *_FindOperationState(
     return state;
 }
 
-- (NSError *)_buildDependencyGraphWithOperations:(NSArray<WEOperation *> *)operations dependencies:(NSArray<WEDependencyDescription *> *)dependencies
+static inline NSHashTable<_WEOperationState *> *_CreateDependencyHashTable()
+{
+    NSPointerFunctionsOptions options = NSPointerFunctionsWeakMemory | NSPointerFunctionsObjectPointerPersonality;
+    return [[NSHashTable alloc] initWithOptions:options capacity:1];
+}
+
+- (NSError *)_buildDependencyGraphWithOperations:(NSArray<WEOperation *> *)operations dependencies:(NSArray<WEDependencyDescription *> *)dependencies segues:(NSArray<WESegueDescription *> *)segues
 {
     NSError *error = nil;
     NSMutableArray<_WEOperationState *> *operationStates = [[NSMutableArray alloc] initWithCapacity:operations.count];
     NSMutableDictionary<NSString *, _WEOperationState *> *namedOperations = [NSMutableDictionary new];
     NSString *name;
-    NSMutableOrderedSet *independentOperations;
+    NSMutableOrderedSet<_WEOperationState *> *independentOperations;
     
+    // Process operations, make vertices
     for (WEOperation *operation in operations)
     {
         _WEOperationState *state = [[_WEOperationState alloc] initWithOperation:operation];
@@ -389,6 +405,8 @@ static _WEOperationState *_FindOperationState(
         }
     }
     
+    // Process dependencies, first kind of nodes.
+    // See note next to ivar declaration describing dependency data structure.
     if (error == nil)
     {
         _allOperationStates = [operationStates copy];
@@ -417,10 +435,42 @@ static _WEOperationState *_FindOperationState(
                     break;
                 }
                 
+                if (fromState->_dependents == nil) fromState->_dependents = _CreateDependencyHashTable();
+                if (toState->_dependsOn == nil) toState->_dependsOn = _CreateDependencyHashTable();
+                
                 [toState->_dependsOn addObject:fromState];
                 [fromState->_dependents addObject:toState];
                 [independentOperations removeObject:toState];
             }
+        }
+    }
+    
+    // Process segues, second kind of nodes
+    // See note next to ivar declaration describing segue data structure and how they are activated.
+    if (error == nil && segues.count > 0)
+    {
+        _hasSeguesInternal = YES;
+        for (WESegueDescription *segue in segues)
+        {
+            _WEOperationState *fromState = _FindOperationState(operationStates, namedOperations, segue.sourceOperation, segue.sourceOperationName);
+            _WEOperationState *toState = _FindOperationState(operationStates, namedOperations, segue.targetOperation, segue.targetOperationName);
+            
+            if (fromState == nil || toState == nil)
+            {
+                NSString *reason = [NSString stringWithFormat:@"Invalid segue %@: from %@ to %@.", segue, fromState ? @"valid" : @"invalid", toState ? @"valid" : @"invalid"];
+                error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowInvalidDependency userInfo:@{ NSLocalizedDescriptionKey: reason }];
+                break;
+            }
+            
+            if (!toState->_hasIncomingSegues)
+            {
+                toState->_activatedIncomingSegues = [NSMutableArray new];
+                toState->_hasIncomingSegues = YES;
+            }
+            if (fromState->_outgoingSegues == nil) fromState->_outgoingSegues = [NSMutableArray new];
+            [fromState->_outgoingSegues addObject:segue];
+            
+            [independentOperations removeObject:toState];
         }
     }
     
@@ -534,19 +584,18 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
         NSUInteger completed = ++(dependent->_completedDependsOnOperations);
         NSUInteger totalDependsOn = dependent->_dependsOn.count;
         WEAssert(completed <= totalDependsOn);
-        if (completed == totalDependsOn)
+        if (completed == totalDependsOn && (!dependent->_hasIncomingSegues || dependent->_activatedIncomingSegues.count > 0))
         {
             [_operationsReadyToExecute addObject:dependent];
         }
     }
     
     // check if workflow is complete.
-    
     if (_activeOperations.count == 0 && _operationsReadyToExecute.count == 0)
     {
-        if (_totalCompletedOperations < _allOperationStates.count)
+        if (_hasSeguesInternal && _totalCompletedOperations < _allOperationStates.count)
         {
-            // TODO: with segues, this may not be an error anymore, revisit.
+            // TODO: improve the check, maybe find a way to validate a workflow with segues.
             NSString *reason = [NSString stringWithFormat:@"Workflow %@ cannot proceed: completed %li of %li operations, but no operations are ready for execution or active.", self, (long)_totalCompletedOperations, (long)_allOperationStates.count];
             NSError *error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowDeadlocked userInfo:@{ NSLocalizedDescriptionKey: reason }];
             [self _completeWorkflowWithError:error];
