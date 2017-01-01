@@ -79,12 +79,15 @@ NSInteger const WEWorkflowDuplicateNames = -10004;
     dispatch_queue_t _delegateQueue;
     
     pthread_mutex_t _operationMutex;
-    dispatch_queue_t _workflowInternalQueue;
     WEWorkflowState _state;
     NSError *_error;
     NSMutableArray<WEOperation *> *_operations;
     NSMutableArray<WEDependencyDescription *> *_dependencies;
     NSMutableArray<WESegueDescription *> *_segues;
+
+    // Internal queue and state that is only accessed on that queue
+    dispatch_queue_t _workflowInternalQueue;
+    BOOL _isFailedInternal;
     NSArray<_WEOperationState *> *_allOperationStates;
     NSUInteger _totalCompletedOperations;
     NSMutableOrderedSet<_WEOperationState *> *_operationsReadyToExecute;
@@ -319,6 +322,7 @@ NSInteger const WEWorkflowDuplicateNames = -10004;
     }
     else
     {
+        _isFailedInternal = NO;
         NSError *error = [self _buildDependencyGraphWithOperations:operations dependencies:dependencies];
         if (error == nil)
         {
@@ -448,6 +452,9 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
 
 - (void)_checkAndStartReadyOperation
 {
+    // If the workflow has failed already, do nothing. The ivar is safe to access on the private queue.
+    if (_isFailedInternal) return;
+    
     // There may not be any operations ready to execute - all operations that are not running are waiting,
     // or there are just running operations that are left.
     if (_operationsReadyToExecute.count == 0)
@@ -489,6 +496,9 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
 
 - (void)_runOperationIfStillPossible:(_WEOperationState *)operationState onQueue:(dispatch_queue_t)queue
 {
+    // If the workflow has failed already, do nothing. The ivar is safe to access on the private queue.
+    if (_isFailedInternal) return;
+    
     WEAssert(operationState != nil);
     WEAssert([_activeOperations containsObject:operationState]);
     
@@ -503,10 +513,11 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
 
 - (void)_completeOperation:(_WEOperationState *)operationState withResult:(WEOperationResult *)result
 {
+    // If the workflow has failed already, do nothing. The ivar is safe to access on the private queue.
+    if (_isFailedInternal) return;
+
     WEAssert(operationState != nil);
     _totalCompletedOperations++;
-    
-    // TODO: if the workflow had failed already, don't proceed.
     
     WEAssert([_activeOperations containsObject:operationState]);
 
@@ -563,6 +574,7 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
 {
     WEAssert(_activeOperations.count == 0);
     WEAssert(_operationsReadyToExecute.count == 0);
+    WEAssert(!_isFailedInternal);
     
     [self _commonCompletion];
     
@@ -585,7 +597,9 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
 - (void)_completeWorkflowWithError:(NSError *)error
 {
     WEAssert(error != nil);
+    WEAssert(!_isFailedInternal);
     
+    _isFailedInternal = YES;
     [self _commonCompletion];
     
     ENTER_CRITICAL_SECTION(self, _operationMutex)
