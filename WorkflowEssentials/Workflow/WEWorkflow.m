@@ -33,6 +33,35 @@ NSInteger const WEWorkflowDeadlocked = -10003;
 NSInteger const WEWorkflowDuplicateNames = -10004;
 NSInteger const WEWorkflowInvalidSegue = -10005;
 
+@class _WEOperationState;
+
+@interface _WEOutgoingSegue : NSObject
+- (instancetype)init NS_UNAVAILABLE;
+- (instancetype)initWithSegue:(nonnull WESegueDescription *)segue targetState:(nonnull _WEOperationState *)targetState;
+@end
+
+@implementation _WEOutgoingSegue
+{
+@package
+    __unsafe_unretained _WEOperationState *_targetState;
+    WESegueDescription *_segue;
+}
+
+- (instancetype)initWithSegue:(WESegueDescription *)segue targetState:(_WEOperationState *)targetState
+{
+    WEAssert(segue != nil);
+    WEAssert(targetState != nil);
+    
+    if (self = [super init])
+    {
+        _targetState = targetState;
+        _segue = segue;
+    }
+    return self;
+}
+
+@end
+
 @interface _WEOperationState : NSObject
 - (instancetype)init NS_UNAVAILABLE;
 - (instancetype)initWithOperation:(nonnull WEOperation *)operation NS_DESIGNATED_INITIALIZER;
@@ -47,8 +76,8 @@ NSInteger const WEWorkflowInvalidSegue = -10005;
     __unsafe_unretained WEOperation *_operation;
     
     // Dependencies are unordered, all dependencies need to be fulfilled before their target can execute.
-    NSHashTable *_dependsOn;
-    NSHashTable *_dependents;
+    NSHashTable<_WEOperationState *> *_dependsOn;
+    NSHashTable<_WEOperationState *> *_dependents;
     NSUInteger _completedDependsOnOperations;
     
     // Segues are ordered.
@@ -56,9 +85,9 @@ NSInteger const WEWorkflowInvalidSegue = -10005;
     // unfulfilled dependencies.
     // Incoming segues fire immediately if the operation does not have unfulfilled dependencies, otherwise
     // they fire in the order they were activated (in the order their sources completed).
-    NSMutableArray *_outgoingSegues;
+    NSMutableArray<_WEOutgoingSegue *> *_outgoingSegues;
     BOOL _hasIncomingSegues;
-    NSMutableArray *_activatedIncomingSegues;
+    NSMutableArray<WESegueDescription *> *_activatedIncomingSegues;
 }
 
 @synthesize operation = _operation;
@@ -468,7 +497,8 @@ static inline NSHashTable<_WEOperationState *> *_CreateDependencyHashTable()
                 toState->_hasIncomingSegues = YES;
             }
             if (fromState->_outgoingSegues == nil) fromState->_outgoingSegues = [NSMutableArray new];
-            [fromState->_outgoingSegues addObject:segue];
+            _WEOutgoingSegue *outgoingSegue = [[_WEOutgoingSegue alloc] initWithSegue:segue targetState:toState];
+            [fromState->_outgoingSegues addObject:outgoingSegue];
             
             [independentOperations removeObject:toState];
         }
@@ -554,6 +584,10 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
     
     // TODO: if an operation cannot run after preparation, remove it from the list of active
     
+    // clear the activated segue list (TODO: in the future may add a block to run when segue-activated operation starts)
+    [operationState->_activatedIncomingSegues removeAllObjects];
+    
+    // dispatch operation execution on a queue that it requested.
     dispatch_async(queue, ^{
         [operationState->_operation startWithCompletion:^(WEOperationResult * _Nullable result) {
             [self _completeOperation:operationState withResult:result];
@@ -587,6 +621,41 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
         if (completed == totalDependsOn && (!dependent->_hasIncomingSegues || dependent->_activatedIncomingSegues.count > 0))
         {
             [_operationsReadyToExecute addObject:dependent];
+        }
+    }
+    
+    // activate outgoing segues
+    if (operationState->_outgoingSegues != nil)
+    {
+        for (_WEOutgoingSegue *segue in operationState->_outgoingSegues)
+        {
+            // evaluate the segue condition
+            WESegueDescription *segueDescription = segue->_segue;
+            NSPredicate *condition = segueDescription.condition;
+            if (condition != nil && ![condition evaluateWithObject:result])
+            {
+                continue;
+            }
+            
+            _WEOperationState *targetState = segue->_targetState;
+            WEAssert(targetState->_hasIncomingSegues);
+
+            if (targetState->_activatedIncomingSegues == nil) targetState->_activatedIncomingSegues = [NSMutableArray new];
+            [targetState->_activatedIncomingSegues addObject:segueDescription];
+            
+            if (targetState->_completedDependsOnOperations == targetState->_dependsOn.count)
+            {
+                BOOL alreadyExecutes = [_operationsReadyToExecute containsObject:targetState];
+                if (!alreadyExecutes)
+                {
+                    WEOperation *targetOperation = targetState->_operation;
+                    alreadyExecutes = targetOperation.active || targetOperation.finished;
+                }
+                if (!alreadyExecutes)
+                {
+                    [_operationsReadyToExecute addObject:targetState];
+                }
+            }
         }
     }
     
