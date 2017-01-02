@@ -15,6 +15,7 @@
 #import <WorkflowEssentials/WEOperation.h>
 #import <WorkflowEssentials/WEBlockOperation.h>
 #import <WorkflowEssentials/WEDependencyDescription.h>
+#import <WorkflowEssentials/WESegueDescription.h>
 
 @interface WEWorkflowTests : XCTestCase
 @end
@@ -462,6 +463,105 @@
         XCTAssertTrue(workflow.completed);
         XCTAssertNotNil(workflow.error);
     }];
+}
+
+
+#pragma mark - Workflow with Segues
+
+- (void)_testWorkflowConditionalSegueFromError:(BOOL)fromError sourceByName:(BOOL)sourceByName targetByName:(BOOL)targetByName
+{
+    // This test creates a workflow with 3 operations: O1, O2 and O3, such that
+    // - there is a conditional segue from O1 to O2 which activates on result being error;
+    // - there is a conditional segue from O1 to O3 which activates on result not being error;
+    // In other words, if O1 fails O2 is executed, otherwise O3 is executed.
+    // Ensure that workflow completes and proper operations have proper results.
+    
+    WEOperationResult *r1 = fromError ? [[WEOperationResult alloc] initWithError:[NSError errorWithDomain:@"fake" code:-1 userInfo:nil]] : [[WEOperationResult alloc] initWithResult:@"r1"];
+    WEOperationResult *r2 = [[WEOperationResult alloc] initWithResult:@"r2"];
+    WEOperationResult *r3 = [[WEOperationResult alloc] initWithResult:@"r3"];
+    
+    OCMockObject<WEWorkflowDelegate> *delegateMock = [OCMockObject mockForProtocol:@protocol(WEWorkflowDelegate)];
+    
+    WEBlockOperation *o1 = [[WEBlockOperation alloc] initWithName:@"o1" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        completion(r1);
+    }];
+    WEBlockOperation *o2 = [[WEBlockOperation alloc] initWithName:@"o2" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTAssertTrue(o1.finished);
+        completion(r2);
+    }];
+    WEBlockOperation *o3 = [[WEBlockOperation alloc] initWithName:@"o3" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTAssertTrue(o1.finished);
+        completion(r3);
+    }];
+    
+    WEWorkflow *workflow = [[WEWorkflow alloc] initWithContextClass:nil maximumConcurrentOperations:3 delegate:delegateMock delegateQueue:dispatch_get_main_queue()];
+    
+    [workflow addOperation:o1];
+    [workflow addOperation:o2];
+    [workflow addOperation:o3];
+
+    WESegueDescription *errorSegue = [[WESegueDescription alloc] init];
+    WESegueDescription *successSegue = [[WESegueDescription alloc] init];
+    if (sourceByName)
+    {
+        errorSegue.sourceOperationName = o1.name;
+        successSegue.sourceOperationName = o1.name;
+    }
+    else
+    {
+        errorSegue.sourceOperation = o1;
+        successSegue.sourceOperation = o1;
+    }
+    
+    if (targetByName)
+    {
+        errorSegue.targetOperationName = o2.name;
+        successSegue.targetOperationName = o3.name;
+    }
+    else
+    {
+        errorSegue.targetOperation = o2;
+        successSegue.targetOperation = o3;
+    }
+    
+    [workflow addSegue:errorSegue];
+    [workflow addSegue:successSegue];
+    
+    XCTestExpectation *expectation = [self expectationWithDescription:@"wait until workflow completes"];
+    
+    [[[delegateMock expect] andDo:^(NSInvocation *invocation) {
+        [expectation fulfill];
+    }] workflowDidComplete:workflow];
+    
+    [[delegateMock reject] workflow:[OCMArg any] didFailWithError:[OCMArg any]];
+    
+    [workflow start];
+    
+    [self waitForExpectationsWithTimeout:1 handler:^(NSError * _Nullable error) {
+        XCTAssertTrue(o1.finished);
+        XCTAssertEqual(o1.result, r1);
+        if (fromError)
+        {
+            XCTAssertTrue(o2.finished);
+            XCTAssertEqual(o2.result, r2);
+        }
+        else
+        {
+            XCTAssertTrue(o3.finished);
+            XCTAssertEqual(o3.result, r3);
+        }
+        XCTAssertTrue(workflow.completed);
+    }];
+}
+
+- (void)testWorkflowConditionalSegueSourceByReferenceTargetByReference
+{
+    [self _testWorkflowConditionalSegueFromError:NO sourceByName:NO targetByName:NO];
+}
+
+- (void)testWorkflowConditionalSegueOtherSideSourceByReferenceTargetByName
+{
+    [self _testWorkflowConditionalSegueFromError:YES sourceByName:NO targetByName:YES];
 }
 
 @end
