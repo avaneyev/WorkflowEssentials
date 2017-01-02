@@ -640,7 +640,6 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
             _WEOperationState *targetState = segue->_targetState;
             WEAssert(targetState->_hasIncomingSegues);
 
-            if (targetState->_activatedIncomingSegues == nil) targetState->_activatedIncomingSegues = [NSMutableArray new];
             [targetState->_activatedIncomingSegues addObject:segueDescription];
             
             if (targetState->_completedDependsOnOperations == targetState->_dependsOn.count)
