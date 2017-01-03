@@ -501,7 +501,13 @@
     [workflow addOperation:o3];
 
     WESegueDescription *errorSegue = [[WESegueDescription alloc] init];
+    errorSegue.condition = [NSPredicate predicateWithBlock:^BOOL(WEOperationResult * _Nullable evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
+        return evaluatedObject.isFailed;
+    }];
     WESegueDescription *successSegue = [[WESegueDescription alloc] init];
+    successSegue.condition = [NSPredicate predicateWithBlock:^BOOL(WEOperationResult * _Nullable evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
+        return !evaluatedObject.isFailed;
+    }];
     if (sourceByName)
     {
         errorSegue.sourceOperationName = o1.name;
@@ -562,6 +568,101 @@
 - (void)testWorkflowConditionalSegueOtherSideSourceByReferenceTargetByName
 {
     [self _testWorkflowConditionalSegueFromError:YES sourceByName:NO targetByName:YES];
+}
+
+
+- (void)_testWorkflowConditionalAndUnconditionalSegueFromError:(BOOL)fromError
+{
+    // This test creates a workflow with 4 operations: O1, O2 and O3, such that
+    // - there is a conditional segue from O1 to O2 which activates on result being error;
+    // - there is a conditional segue from O1 to O3 which activates on result not being error;
+    // - there are 2 unconditional segues: O2 -> O4 and O3 -> O4;
+    // In other words, if O1 fails O2 is executed, otherwise O3 is executed, and either way O4 follows.
+    // Ensure that workflow completes and proper operations have proper results.
+    
+    WEOperationResult *r1 = fromError ? [[WEOperationResult alloc] initWithError:[NSError errorWithDomain:@"fake" code:-1 userInfo:nil]] : [[WEOperationResult alloc] initWithResult:@"r1"];
+    WEOperationResult *r2 = [[WEOperationResult alloc] initWithResult:@"r2"];
+    WEOperationResult *r3 = [[WEOperationResult alloc] initWithResult:@"r3"];
+    WEOperationResult *r4 = [[WEOperationResult alloc] initWithResult:@"r4"];
+    
+    OCMockObject<WEWorkflowDelegate> *delegateMock = [OCMockObject mockForProtocol:@protocol(WEWorkflowDelegate)];
+    
+    WEBlockOperation *o1 = [[WEBlockOperation alloc] initWithName:@"o1" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        completion(r1);
+    }];
+    WEBlockOperation *o2 = [[WEBlockOperation alloc] initWithName:@"o2" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTAssertTrue(o1.finished);
+        completion(r2);
+    }];
+    WEBlockOperation *o3 = [[WEBlockOperation alloc] initWithName:@"o3" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTAssertTrue(o1.finished);
+        completion(r3);
+    }];
+    WEBlockOperation *o4 = [[WEBlockOperation alloc] initWithName:@"o4" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        WEOperation *o = fromError ? o2 : o3;
+        XCTAssertTrue(o.finished);
+        completion(r4);
+    }];
+    
+    WEWorkflow *workflow = [[WEWorkflow alloc] initWithContextClass:nil maximumConcurrentOperations:3 delegate:delegateMock delegateQueue:dispatch_get_main_queue()];
+    
+    [workflow addOperation:o1];
+    [workflow addOperation:o2];
+    [workflow addOperation:o3];
+    [workflow addOperation:o4];
+    
+    NSPredicate *errorCondition = [NSPredicate predicateWithBlock:^BOOL(WEOperationResult * _Nullable evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
+        return evaluatedObject.isFailed;
+    }];
+    WESegueDescription *errorSegue = [WESegueDescription segueFromOperationName:o1.name toOperationName:o2.name condition:errorCondition];
+
+    NSPredicate *successCondition = [NSPredicate predicateWithBlock:^BOOL(WEOperationResult * _Nullable evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
+        return !evaluatedObject.isFailed;
+    }];
+    WESegueDescription *successSegue = [WESegueDescription segueFromOperationName:o1.name toOperationName:o3.name condition:successCondition];
+    
+    WESegueDescription *firstMergeSegue = [WESegueDescription segueFromOperationName:o2.name toOperationName:o4.name condition:nil];
+    WESegueDescription *secondMergeSegue = [WESegueDescription segueFromOperationName:o3.name toOperationName:o4.name condition:nil];
+    
+    [workflow addSegue:errorSegue];
+    [workflow addSegue:successSegue];
+    [workflow addSegue:firstMergeSegue];
+    [workflow addSegue:secondMergeSegue];
+    
+    XCTestExpectation *expectation = [self expectationWithDescription:@"wait until workflow completes"];
+    
+    [[[delegateMock expect] andDo:^(NSInvocation *invocation) {
+        [expectation fulfill];
+    }] workflowDidComplete:workflow];
+    
+    [[delegateMock reject] workflow:[OCMArg any] didFailWithError:[OCMArg any]];
+    
+    [workflow start];
+    
+    [self waitForExpectationsWithTimeout:1 handler:^(NSError * _Nullable error) {
+        XCTAssertTrue(o1.finished);
+        XCTAssertEqual(o1.result, r1);
+        if (fromError)
+        {
+            XCTAssertTrue(o2.finished);
+            XCTAssertEqual(o2.result, r2);
+        }
+        else
+        {
+            XCTAssertTrue(o3.finished);
+            XCTAssertEqual(o3.result, r3);
+        }
+        XCTAssertTrue(o4.finished);
+        XCTAssertEqual(o4.result, r4);
+
+        XCTAssertTrue(workflow.completed);
+    }];
+}
+
+- (void)testWorkflowConditionalAndUnconditionalSegue
+{
+    [self _testWorkflowConditionalAndUnconditionalSegueFromError:NO];
+    [self _testWorkflowConditionalAndUnconditionalSegueFromError:YES];
 }
 
 @end

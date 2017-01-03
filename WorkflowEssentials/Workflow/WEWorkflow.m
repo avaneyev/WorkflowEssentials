@@ -661,7 +661,7 @@ static inline dispatch_queue_t _WEQueueForOperation(__unsafe_unretained WEOperat
     // check if workflow is complete.
     if (_activeOperations.count == 0 && _operationsReadyToExecute.count == 0)
     {
-        if (_hasSeguesInternal && _totalCompletedOperations < _allOperationStates.count)
+        if (!_hasSeguesInternal && _totalCompletedOperations < _allOperationStates.count)
         {
             // TODO: improve the check, maybe find a way to validate a workflow with segues.
             NSString *reason = [NSString stringWithFormat:@"Workflow %@ cannot proceed: completed %li of %li operations, but no operations are ready for execution or active.", self, (long)_totalCompletedOperations, (long)_allOperationStates.count];

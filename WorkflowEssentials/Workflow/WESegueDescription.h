@@ -25,4 +25,6 @@
  */
 @property (nonatomic, strong, nullable) NSPredicate *condition;
 
++ (nonnull WESegueDescription *)segueFromOperationName:(nonnull NSString *)from toOperationName:(nonnull NSString *)to condition:(nullable NSPredicate *)condition;
+
 @end
