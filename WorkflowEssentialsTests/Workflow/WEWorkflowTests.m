@@ -569,6 +569,11 @@
     [self _testWorkflowConditionalSegueFromError:NO sourceByName:NO targetByName:NO];
 }
 
+- (void)testWorkflowConditionalSegueSourceByNameTargetByName
+{
+    [self _testWorkflowConditionalSegueFromError:NO sourceByName:YES targetByName:YES];
+}
+
 - (void)testWorkflowConditionalSegueOtherSideSourceByReferenceTargetByName
 {
     [self _testWorkflowConditionalSegueFromError:YES sourceByName:NO targetByName:YES];
