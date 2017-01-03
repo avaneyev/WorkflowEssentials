@@ -550,9 +550,13 @@
         {
             XCTAssertTrue(o2.finished);
             XCTAssertEqual(o2.result, r2);
+
+            XCTAssertFalse(o3.finished);
         }
         else
         {
+            XCTAssertFalse(o2.finished);
+            
             XCTAssertTrue(o3.finished);
             XCTAssertEqual(o3.result, r3);
         }
@@ -646,9 +650,13 @@
         {
             XCTAssertTrue(o2.finished);
             XCTAssertEqual(o2.result, r2);
+
+            XCTAssertFalse(o3.finished);
         }
         else
         {
+            XCTAssertFalse(o2.finished);
+
             XCTAssertTrue(o3.finished);
             XCTAssertEqual(o3.result, r3);
         }
