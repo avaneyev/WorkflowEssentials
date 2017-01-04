@@ -288,6 +288,8 @@ NSInteger const WEWorkflowInvalidSegue = -10005;
     if (dependency == nil) THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Dependency not specified" });
     if (dependency.sourceOperation == nil && dependency.sourceOperationName == nil) THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Source operation not specified" });
     if (dependency.targetOperation == nil && dependency.targetOperationName == nil) THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Target operation not specified" });
+    if (dependency.targetOperation != nil && dependency.targetOperation == dependency.sourceOperation) THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Source and target are the same" });
+    if (dependency.targetOperationName != nil && dependency.targetOperationName == dependency.sourceOperationName) THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Source and target are the same" });
     
     ENTER_CRITICAL_SECTION(self, _operationMutex)
 
@@ -302,6 +304,8 @@ NSInteger const WEWorkflowInvalidSegue = -10005;
     if (segue == nil) THROW_INVALID_PARAM(segue, @{ NSLocalizedDescriptionKey: @"Segue not specified" });
     if (segue.sourceOperation == nil && segue.sourceOperationName == nil) THROW_INVALID_PARAM(segue, @{ NSLocalizedDescriptionKey: @"Source operation not specified" });
     if (segue.targetOperation == nil && segue.targetOperationName == nil) THROW_INVALID_PARAM(dependency, @{ NSLocalizedDescriptionKey: @"Target operation not specified" });
+    if (segue.targetOperation != nil && segue.targetOperation == segue.sourceOperation) THROW_INVALID_PARAM(segue, @{ NSLocalizedDescriptionKey: @"Source and target are the same" });
+    if (segue.targetOperationName != nil && segue.targetOperationName == segue.sourceOperationName) THROW_INVALID_PARAM(segue, @{ NSLocalizedDescriptionKey: @"Source and target are the same" });
 
     ENTER_CRITICAL_SECTION(self, _operationMutex)
     
@@ -446,7 +450,7 @@ static inline NSHashTable<_WEOperationState *> *_CreateDependencyHashTable()
             _WEOperationState *fromState = _FindOperationState(operationStates, namedOperations, dependency.sourceOperation, dependency.sourceOperationName);
             _WEOperationState *toState = _FindOperationState(operationStates, namedOperations, dependency.targetOperation, dependency.targetOperationName);
             
-            if (fromState == nil || toState == nil)
+            if (fromState == nil || toState == nil || fromState == toState)
             {
                 NSString *reason = [NSString stringWithFormat:@"Invalid dependency %@: from %@ to %@.", dependency, fromState ? @"valid" : @"invalid", toState ? @"valid" : @"invalid"];
                 error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowInvalidDependency userInfo:@{ NSLocalizedDescriptionKey: reason }];
@@ -484,7 +488,7 @@ static inline NSHashTable<_WEOperationState *> *_CreateDependencyHashTable()
             _WEOperationState *fromState = _FindOperationState(operationStates, namedOperations, segue.sourceOperation, segue.sourceOperationName);
             _WEOperationState *toState = _FindOperationState(operationStates, namedOperations, segue.targetOperation, segue.targetOperationName);
             
-            if (fromState == nil || toState == nil)
+            if (fromState == nil || toState == nil || fromState == toState)
             {
                 NSString *reason = [NSString stringWithFormat:@"Invalid segue %@: from %@ to %@.", segue, fromState ? @"valid" : @"invalid", toState ? @"valid" : @"invalid"];
                 error = [NSError errorWithDomain:WEWorkflowErrorDomain code:WEWorkflowInvalidDependency userInfo:@{ NSLocalizedDescriptionKey: reason }];

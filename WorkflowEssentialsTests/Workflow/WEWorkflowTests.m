@@ -582,7 +582,7 @@
 
 - (void)_testWorkflowConditionalAndUnconditionalSegueFromError:(BOOL)fromError
 {
-    // This test creates a workflow with 4 operations: O1, O2 and O3, such that
+    // This test creates a workflow with 4 operations: O1, O2, O3 and O4, such that
     // - there is a conditional segue from O1 to O2 which activates on result being error;
     // - there is a conditional segue from O1 to O3 which activates on result not being error;
     // - there are 2 unconditional segues: O2 -> O4 and O3 -> O4;
@@ -676,6 +676,86 @@
 {
     [self _testWorkflowConditionalAndUnconditionalSegueFromError:NO];
     [self _testWorkflowConditionalAndUnconditionalSegueFromError:YES];
+}
+
+- (void)testWorkflowSeguesAndDependencies
+{
+    // This test creates a workflow with 4 operations: O1, O2, O3 and O4 with the following connections:
+    // Unconditional segue O1 -> O2
+    // Unconditional segue O1 -> O3
+    // Conditional segue with a condition that is always false O1 -> O4
+    // Dependency O2 -> O3
+    // Dependency O2 -> O4
+    // Expected behavior is to run the operations in the following order: O1 -> O2 -> O3, because:
+    // - O1 is independent and can start
+    // - O2 is started once a segue to it activates
+    // - O3 does not start until its dependency (O2) completes, even though segue from O1 was activated
+    // - O4 does not run at all because none of the incoming segues ever activate, even though its dependencies (O2)
+    //   have completed
+    
+    WEOperationResult *r1 = [[WEOperationResult alloc] initWithResult:@"r1"];
+    WEOperationResult *r2 = [[WEOperationResult alloc] initWithResult:@"r2"];
+    WEOperationResult *r3 = [[WEOperationResult alloc] initWithResult:@"r3"];
+    
+    OCMockObject<WEWorkflowDelegate> *delegateMock = [OCMockObject mockForProtocol:@protocol(WEWorkflowDelegate)];
+    
+    WEBlockOperation *o1 = [[WEBlockOperation alloc] initWithName:@"o1" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        completion(r1);
+    }];
+    WEBlockOperation *o2 = [[WEBlockOperation alloc] initWithName:@"o2" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTAssertTrue(o1.finished);
+        completion(r2);
+    }];
+    WEBlockOperation *o3 = [[WEBlockOperation alloc] initWithName:@"o3" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTAssertTrue(o1.finished);
+        XCTAssertTrue(o2.finished);
+        completion(r3);
+    }];
+    WEBlockOperation *o4 = [[WEBlockOperation alloc] initWithName:@"o4" requiresMainThread:NO block:^(void (^ _Nonnull completion)(WEOperationResult * _Nonnull)) {
+        XCTFail(@"This should never run, see comment in the test header describing why.");
+    }];
+    
+    WEWorkflow *workflow = [[WEWorkflow alloc] initWithContextClass:nil maximumConcurrentOperations:3 delegate:delegateMock delegateQueue:dispatch_get_main_queue()];
+    
+    [workflow addOperation:o1];
+    [workflow addOperation:o2];
+    [workflow addOperation:o3];
+    [workflow addOperation:o4];
+    
+    NSPredicate *alwaysFailingCondition = [NSPredicate predicateWithBlock:^BOOL(WEOperationResult * _Nullable evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
+        return NO;
+    }];
+    WESegueDescription *firstSegue = [WESegueDescription segueFromOperationName:o1.name toOperationName:o2.name condition:nil];
+    WESegueDescription *secondSegue = [WESegueDescription segueFromOperationName:o2.name toOperationName:o3.name condition:nil];
+    WESegueDescription *neverActivatedSegue = [WESegueDescription segueFromOperationName:o1.name toOperationName:o4.name condition:alwaysFailingCondition];
+
+    WEDependencyDescription *firstDependency = [WEDependencyDescription dependencyFormOperationName:o2.name toOperationName:o3.name];
+    WEDependencyDescription *secondDependency = [WEDependencyDescription dependencyFormOperationName:o2.name toOperationName:o4.name];
+    
+    [workflow addSegue:firstSegue];
+    [workflow addSegue:secondSegue];
+    [workflow addSegue:neverActivatedSegue];
+    [workflow addDependency:firstDependency];
+    [workflow addDependency:secondDependency];
+    
+    XCTestExpectation *expectation = [self expectationWithDescription:@"wait until workflow completes"];
+    
+    [[[delegateMock expect] andDo:^(NSInvocation *invocation) {
+        [expectation fulfill];
+    }] workflowDidComplete:workflow];
+    
+    [[delegateMock reject] workflow:[OCMArg any] didFailWithError:[OCMArg any]];
+    
+    [workflow start];
+    
+    [self waitForExpectationsWithTimeout:1 handler:^(NSError * _Nullable error) {
+        XCTAssertTrue(o1.finished);
+        XCTAssertEqual(o1.result, r1);
+        XCTAssertTrue(o2.finished);
+        XCTAssertEqual(o2.result, r2);
+        XCTAssertTrue(o3.finished);
+        XCTAssertEqual(o3.result, r3);
+    }];
 }
 
 @end
