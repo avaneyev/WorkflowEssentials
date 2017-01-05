@@ -21,4 +21,13 @@
     return copy;
 }
 
++ (nonnull WESegueDescription *)segueFromOperationName:(nonnull NSString *)from toOperationName:(nonnull NSString *)to condition:(nullable NSPredicate *)condition
+{
+    WESegueDescription *segue = [[WESegueDescription alloc] init];
+    segue.sourceOperationName = from;
+    segue.targetOperationName = to;
+    segue.condition = condition;
+    return segue;
+}
+
 @end
