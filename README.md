@@ -16,6 +16,13 @@ These individual steps may be connected in many different ways (different errors
 
 **Workflow Essentials** aims to simplify the implementation of workflows by providing basic classes for a workflow, individual steps and transitions.
 
+#### How is it different from `NSOperationQueue`?
+In a few ways:
+- Operations are not thread- or queue-bound, and can execute on different threads based on what operation requests.
+- In addition to dependencies there are other types of connections that make it possible to express more complex processes.
+- Connections may refer to operations by reference or by name which makes it easier to write modular, loosely coupled code.
+- Operations are much easier to implement (no KVO involved, just do the work and invoke completion when done).
+
 ## Getting Started
 Starting with Workflow Essentials:
 - Include a precompiled framework OR add individual files to your project.
@@ -100,12 +107,47 @@ WEBlockOperation<NSString *> *blockOperation = [[WEBlockOperation alloc] initWit
 }];
 ```
 
+### Add connections
+Dependency:
+``` Objective-C
+WEDependencyDescription *firstDependency = [[WEDependencyDescription alloc] init];
+firstDependency.sourceOperationName = @"firstName";
+firstDependency.targetOperationName = @"secondName";
+[workflow addDependency:firstDependency];
+
+WEOperation *o1 = ..., *o2 = ...; 
+WEDependencyDescription *secondDependency = [[WEDependencyDescription alloc] init];
+secondDependency.sourceOperation = o1;
+secondDependency.targetOperation = o2;
+[workflow addDependency:secondDependency];
+```
+
+Segue:
+``` Objective-C
+WESegueDescription *errorSegue = [[WESegueDescription alloc] init];
+errorSegue.condition = [NSPredicate predicateWithBlock:^BOOL(WEOperationResult * _Nullable evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
+    return evaluatedObject.isFailed;
+}];
+errorSegue.sourceOperationName = @"firstName";
+errorSegue.targetOperationName = @"secondName";
+
+[workflow addSegue:errorSegue];
+```
+
 ### Start a Workflow
 
 ``` Objective-C
 WEWorkflow *workflow = ...; 
 [workflow start];
 ```
+
+## Plans for future versions:
+- Add more types of connections. Specifically, plan to add a semaphore, which will prevent an operation from running when certain condition is met - for example, another operation is running (can be used for UI operations that ar mutually exclusive) or another operation had failed (don't attempt to run more operations if it's known that workflow as a whole failed).
+- Improve error checks, like loop detection, inside a workflow.
+- Implement resettable operations, which could be re-run, allowing the workflow to define a loop.
+- Implement sequential workflow, which would implement operations one by one and will be able to go back to any point in that flow. Represents, for example, a sequence of dialogs with a submission in the end, where submission failure would send a user back to the incorrectly filled page.
+- Add an ability for an operation to stack up work items in front of itself during preparation.
+- ... and more.
 
 ## Credits
 **Workflow Essentials** uses [OCMock](http://ocmock.org), a great framework for creating mocks in all kinds of tests.
