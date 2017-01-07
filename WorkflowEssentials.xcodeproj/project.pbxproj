@@ -6,6 +6,20 @@
 	objectVersion = 46;
 	objects = {
 
+/* Begin PBXAggregateTarget section */
+		D5B56FC61E20920D00257DC4 /* WorkflowEssentials-Universal */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = D5B56FC91E20920D00257DC4 /* Build configuration list for PBXAggregateTarget "WorkflowEssentials-Universal" */;
+			buildPhases = (
+				D5B56FCA1E2093E000257DC4 /* ShellScript */,
+			);
+			dependencies = (
+			);
+			name = "WorkflowEssentials-Universal";
+			productName = "WorkflowEssentials-Universal";
+		};
+/* End PBXAggregateTarget section */
+
 /* Begin PBXBuildFile section */
 		D50F35A91E062D950076A465 /* WEDependencyDescription.h in Headers */ = {isa = PBXBuildFile; fileRef = D50F35A71E062D950076A465 /* WEDependencyDescription.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		D50F35AA1E062D950076A465 /* WEDependencyDescription.m in Sources */ = {isa = PBXBuildFile; fileRef = D50F35A81E062D950076A465 /* WEDependencyDescription.m */; };
@@ -307,6 +321,10 @@
 						CreatedOnToolsVersion = 8.1;
 						ProvisioningStyle = Automatic;
 					};
+					D5B56FC61E20920D00257DC4 = {
+						CreatedOnToolsVersion = 8.2.1;
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = D57205CF1DE23D580071E38A /* Build configuration list for PBXProject "WorkflowEssentials" */;
@@ -323,6 +341,7 @@
 			targets = (
 				D57205D41DE23D580071E38A /* WorkflowEssentials */,
 				D57205DD1DE23D580071E38A /* WorkflowEssentialsTests */,
+				D5B56FC61E20920D00257DC4 /* WorkflowEssentials-Universal */,
 			);
 		};
 /* End PBXProject section */
@@ -344,6 +363,22 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		D5B56FCA1E2093E000257DC4 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "######################\n# Slightly modified version of the script from here:\n# https://medium.com/@syshen/create-an-ios-universal-framework-148eb130a46c#.ss893su3x\n######################\n\n######################\n# Options\n######################\n\nREVEAL_ARCHIVE_IN_FINDER=false\n\nFRAMEWORK_NAME=\"${PROJECT_NAME}\"\n\nSIMULATOR_LIBRARY_PATH=\"${BUILD_DIR}/${CONFIGURATION}-iphonesimulator/${FRAMEWORK_NAME}.framework\"\n\nDEVICE_LIBRARY_PATH=\"${BUILD_DIR}/${CONFIGURATION}-iphoneos/${FRAMEWORK_NAME}.framework\"\n\nUNIVERSAL_LIBRARY_DIR=\"${BUILD_DIR}/${CONFIGURATION}-iphoneuniversal\"\n\nFRAMEWORK=\"${UNIVERSAL_LIBRARY_DIR}/${FRAMEWORK_NAME}.framework\"\n\n\n######################\n# Build Frameworks\n######################\n\nxcodebuild -project ${PROJECT_NAME}.xcodeproj -scheme ${PROJECT_NAME} -sdk iphonesimulator -configuration ${CONFIGURATION} clean build CONFIGURATION_BUILD_DIR=${BUILD_DIR}/${CONFIGURATION}-iphonesimulator 2>&1\n\nxcodebuild -project ${PROJECT_NAME}.xcodeproj -scheme ${PROJECT_NAME}  -sdk iphoneos -configuration ${CONFIGURATION} clean build CONFIGURATION_BUILD_DIR=${BUILD_DIR}/${CONFIGURATION}-iphoneos 2>&1\n\n######################\n# Create directory for universal\n######################\n\nrm -rf \"${UNIVERSAL_LIBRARY_DIR}\"\n\nmkdir \"${UNIVERSAL_LIBRARY_DIR}\"\n\nmkdir \"${FRAMEWORK}\"\n\n\n######################\n# Copy files Framework\n######################\n\ncp -r \"${DEVICE_LIBRARY_PATH}/.\" \"${FRAMEWORK}\"\n\n\n######################\n# Make an universal binary\n######################\n\nlipo \"${SIMULATOR_LIBRARY_PATH}/${FRAMEWORK_NAME}\" \"${DEVICE_LIBRARY_PATH}/${FRAMEWORK_NAME}\" -create -output \"${FRAMEWORK}/${FRAMEWORK_NAME}\" | echo\n\n\n######################\n# On Release, copy the result to release directory\n######################\nOUTPUT_DIR=\"${PROJECT_DIR}/Output/${FRAMEWORK_NAME}-${CONFIGURATION}-iphoneuniversal/\"\n\nrm -rf \"$OUTPUT_DIR\"\nmkdir -p \"$OUTPUT_DIR\"\n\ncp -r \"${FRAMEWORK}\" \"$OUTPUT_DIR\"\n\nif [ ${REVEAL_ARCHIVE_IN_FINDER} = true ]; then\nopen \"${OUTPUT_DIR}/\"\nfi";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		D57205D01DE23D580071E38A /* Sources */ = {
@@ -565,6 +600,20 @@
 			};
 			name = Release;
 		};
+		D5B56FC71E20920D00257DC4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		D5B56FC81E20920D00257DC4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -594,6 +643,14 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
+		};
+		D5B56FC91E20920D00257DC4 /* Build configuration list for PBXAggregateTarget "WorkflowEssentials-Universal" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D5B56FC71E20920D00257DC4 /* Debug */,
+				D5B56FC81E20920D00257DC4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
 		};
 /* End XCConfigurationList section */
 	};
